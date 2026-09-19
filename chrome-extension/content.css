@@ -1,0 +1,15 @@
+/* AutoPoster Pro - Content Script Styles */
+/* Minimal CSS since most styles are inline in content.js */
+
+#autoposter-paste-btn:hover {
+  transform: translateY(-2px) !important;
+}
+
+#autoposter-paste-btn:active {
+  transform: translateY(0) !important;
+}
+
+#autoposter-paste-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

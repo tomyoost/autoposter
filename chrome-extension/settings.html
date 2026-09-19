@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autoposter - Settings</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-row">
+        <button id="backBtn" class="btn-icon-only" title="Back">
+          ← 
+        </button>
+        <div class="logo">
+          <img src="icons/icon48.png" alt="Autoposter Logo">
+          <h1>Autoposter</h1>
+        </div>
+        <div class="spacer"></div>
+      </div>
+      <p class="tagline" data-i18n="settings">Settings</p>
+    </header>
+
+    <section class="form-section">
+      <h2 class="section-title"><span data-i18n="language">Language</span></h2>
+      <div class="language-selector">
+        <button class="lang-btn" data-lang="nl">
+          <span class="lang-flag">🇳🇱</span>
+          <span>Nederlands</span>
+        </button>
+        <button class="lang-btn" data-lang="en">
+          <span class="lang-flag">🇬🇧</span>
+          <span>English</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="form-section">
+      <h2 class="section-title"><span data-i18n="templates">Templates</span></h2>
+      <p class="section-description" data-i18n="templatesDescription">
+        Create custom templates for each platform. Use placeholders like {{title}}, {{price}}, etc.
+      </p>
+      
+      <div class="template-tabs">
+        <button class="tab-btn active" data-platform="vinted">Vinted</button>
+        <button class="tab-btn" data-platform="marktplaats">Marktplaats</button>
+        <button class="tab-btn" data-platform="facebook">Facebook</button>
+        <button class="tab-btn" data-platform="etsy">Etsy</button>
+        <button class="tab-btn" data-platform="ebay">eBay</button>
+      </div>
+
+      <div class="template-editor">
+        <div class="placeholder-help">
+          <p class="help-title" data-i18n="availablePlaceholders">Available placeholders:</p>
+          <div class="placeholder-grid">
+            <code>{{title}}</code>
+            <code>{{price}}</code>
+            <code>{{condition}}</code>
+            <code>{{category}}</code>
+            <code>{{tags}}</code>
+            <code>{{description}}</code>
+            <code>{{extraInfo}}</code>
+            <code>{{brand}}</code>
+            <code>{{size}}</code>
+            <code>{{color}}</code>
+            <code>{{material}}</code>
+          </div>
+        </div>
+        
+        <textarea 
+          id="templateEditor" 
+          class="template-textarea"
+          rows="8"
+          placeholder="Enter your custom template here...
+
+Example:
+{{title}} | {{condition}}
+
+{{description}}
+
+{{extraInfo}}
+
+Price: €{{price}}
+
+{{tags}}"
+        ></textarea>
+        
+        <div class="template-actions">
+          <button id="saveTemplateBtn" class="btn btn-secondary">
+            <span data-i18n="saveTemplate">Save Template</span>
+          </button>
+          <button id="loadExampleBtn" class="btn btn-outline">
+            <span data-i18n="loadExample">Load Example</span>
+          </button>
+          <button id="resetTemplateBtn" class="btn btn-outline">
+            <span data-i18n="useAI">Use AI (no template)</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Subscription Management Section -->
+    <section class="form-section" id="subscriptionSection">
+      <h2 class="section-title"><span data-i18n="subscription">Subscription</span></h2>
+      <div class="subscription-info">
+        <div class="current-plan-row">
+          <span data-i18n="currentLicense">Current plan:</span>
+          <span class="plan-badge" id="currentPlanBadge">Free</span>
+        </div>
+        <p class="subscription-help" data-i18n="subscriptionHelp">Manage your subscription on Gumroad to upgrade, downgrade, or cancel.</p>
+        <a href="https://app.gumroad.com/library" target="_blank" class="btn btn-outline subscription-link" id="manageSubscriptionBtn">
+          <span data-i18n="manageSubscription">Manage Subscription</span>
+          <span class="external-icon">↗</span>
+        </a>
+      </div>
+    </section>
+
+
+    <section class="form-section">
+      <h2 class="section-title"><span data-i18n="placeholderInfo">Placeholder Info</span></h2>
+      <div class="info-table">
+        <div class="info-row">
+          <code>{{title}}</code>
+          <span data-i18n="placeholderTitle">Product title</span>
+        </div>
+        <div class="info-row">
+          <code>{{price}}</code>
+          <span data-i18n="placeholderPrice">Price (number only, without €)</span>
+        </div>
+        <div class="info-row">
+          <code>{{condition}}</code>
+          <span data-i18n="placeholderCondition">Product condition</span>
+        </div>
+        <div class="info-row">
+          <code>{{category}}</code>
+          <span data-i18n="placeholderCategory">Category</span>
+        </div>
+        <div class="info-row">
+          <code>{{tags}}</code>
+          <span data-i18n="placeholderTags">Tags (for Vinted: as #hashtags)</span>
+        </div>
+        <div class="info-row">
+          <code>{{description}}</code>
+          <span data-i18n="placeholderDescription">Your description text</span>
+        </div>
+        <div class="info-row">
+          <code>{{extraInfo}}</code>
+          <span data-i18n="placeholderExtraInfo">Additional info (brand, size, etc.)</span>
+        </div>
+        <div class="info-row">
+          <code>{{brand}}</code>
+          <span data-i18n="placeholderBrand">Brand (from AI analysis)</span>
+        </div>
+        <div class="info-row">
+          <code>{{size}}</code>
+          <span data-i18n="placeholderSize">Size (from AI analysis)</span>
+        </div>
+        <div class="info-row">
+          <code>{{color}}</code>
+          <span data-i18n="placeholderColor">Color (from AI analysis)</span>
+        </div>
+        <div class="info-row">
+          <code>{{material}}</code>
+          <span data-i18n="placeholderMaterial">Material (from AI analysis)</span>
+        </div>
+      </div>
+    </section>
+
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

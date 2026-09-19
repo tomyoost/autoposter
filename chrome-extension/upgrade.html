@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upgrade - AutoPoster Pro</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="upgrade.css">
+</head>
+<body>
+  <div class="upgrade-container">
+    <header class="upgrade-header">
+      <button class="back-btn" id="backBtn">
+        <span>←</span>
+        <span data-i18n="back">Terug</span>
+      </button>
+      <button class="lang-toggle" id="langToggle" title="Switch language">🇳🇱</button>
+      <h1 data-i18n="upgradeTitle">Kies je plan</h1>
+      <p class="subtitle" data-i18n="upgradeSubtitle">Schaal mee met je verkoopvolume</p>
+    </header>
+
+    <div class="current-plan" id="currentPlan">
+      <span class="current-label" data-i18n="currentPlan">Huidig plan:</span>
+      <span class="current-tier" id="currentTier">FREE</span>
+      <span class="current-usage" id="currentUsage">0/3</span>
+    </div>
+
+    <div class="pricing-grid">
+      <!-- Free Tier -->
+      <div class="pricing-card" data-tier="free">
+        <div class="card-header">
+          <h2 data-i18n="tierFree">Free</h2>
+          <p class="tier-desc" data-i18n="tierFreeDesc">Perfect voor casual sellers</p>
+          <div class="price">
+            <span class="amount">€0</span>
+            <span class="period" data-i18n="perMonth">/maand</span>
+          </div>
+        </div>
+        <ul class="features">
+          <li class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span>3 <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
+          </li>
+          <li class="feature-item disabled">
+            <span class="feature-icon">✗</span>
+            <span data-i18n="featureEmailSupport">Email support</span>
+          </li>
+        </ul>
+        <button class="btn btn-outline current-btn" disabled data-i18n="currentButton">Huidig plan</button>
+      </div>
+
+      <!-- Starter Tier -->
+      <div class="pricing-card popular" data-tier="starter">
+        <div class="popular-badge" data-i18n="popular">Populair</div>
+        <div class="card-header">
+          <h2 data-i18n="tierStarter">Starter</h2>
+          <p class="tier-desc" data-i18n="tierStarterDesc">Voor regelmatige verkopers</p>
+          <div class="price">
+            <span class="amount">€9.99</span>
+            <span class="period" data-i18n="perMonth">/maand</span>
+          </div>
+        </div>
+        <ul class="features">
+          <li class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span>50 <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span data-i18n="featureSupport48h">Email support (48u)</span>
+          </li>
+        </ul>
+        <button class="btn btn-primary upgrade-btn" data-tier="starter" data-url="https://autoposter.gumroad.com/l/starter">
+          <span data-i18n="upgradeButton">Upgrade</span> <span data-i18n="tierStarter">Starter</span>
+        </button>
+      </div>
+
+      <!-- Pro Tier -->
+      <div class="pricing-card" data-tier="pro">
+        <div class="card-header">
+          <h2 data-i18n="tierPro">Pro</h2>
+          <p class="tier-desc" data-i18n="tierProDesc">Voor power resellers</p>
+          <div class="price">
+            <span class="amount">€19.99</span>
+            <span class="period" data-i18n="perMonth">/maand</span>
+          </div>
+        </div>
+        <ul class="features">
+          <li class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span data-i18n="featureUnlimitedAI">Onbeperkt AI analyses</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span data-i18n="featureSupport24h">Email support (24u)</span>
+          </li>
+          <li class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span data-i18n="featureEarlyAccess">Vroegtijdige toegang tot nieuwe features</span>
+          </li>
+        </ul>
+        <button class="btn btn-secondary upgrade-btn" data-tier="pro" data-url="https://autoposter.gumroad.com/l/pro">
+          <span data-i18n="upgradeButton">Upgrade</span> <span data-i18n="tierPro">Pro</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- License Key Section -->
+    <div class="license-section">
+      <h3 data-i18n="licenseSettings">License Key Activeren</h3>
+      <p class="license-desc" data-i18n="licenseHelp">Heb je een license key gekocht? Voer deze hieronder in om je plan te activeren.</p>
+      <div class="license-input-wrapper">
+        <input 
+          type="text" 
+          id="licenseKeyInput" 
+          class="license-key-input" 
+          placeholder="XXXX-XXXX-XXXX-XXXX"
+          maxlength="24"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <button id="activateLicenseBtn" class="btn btn-activate" data-i18n="activateLicense">Activeren</button>
+      </div>
+      <p id="licenseMessage" class="license-message"></p>
+    </div>
+
+    <div class="faq-section">
+      <h3 data-i18n="faqTitle">Veelgestelde vragen</h3>
+      <div class="faq-item">
+        <strong data-i18n="faqKeyQuestion">Hoe krijg ik mijn license key?</strong>
+        <p data-i18n="faqKeyAnswer">Na aankoop ontvang je je license key per email. Voer deze hieronder in.</p>
+      </div>
+      <div class="faq-item">
+        <strong data-i18n="faqUpgradeQuestion">Kan ik op elk moment upgraden?</strong>
+        <p data-i18n="faqUpgradeAnswer">Ja! Je kunt op elk moment upgraden en je nieuwe limiet gaat direct in.</p>
+      </div>
+      <div class="faq-item">
+        <strong data-i18n="faqLimitQuestion">Wat als ik mijn limiet bereik?</strong>
+        <p data-i18n="faqLimitAnswer">Je ziet een upgrade melding. Je kunt alle velden nog handmatig invullen, maar krijgt geen AI hulp meer deze maand.</p>
+      </div>
+      <div class="faq-item">
+        <strong data-i18n="faqCancelQuestion">Kan ik mijn abonnement opzeggen?</strong>
+        <p data-i18n="faqCancelAnswer">Ja, je kunt op elk moment opzeggen. Je houdt toegang tot het einde van je betaalperiode.</p>
+      </div>
+    </div>
+
+    <footer class="upgrade-footer">
+      <p>
+        <span data-i18n="footerQuestions">Vragen?</span> 
+        <a href="https://discord.gg/autoposter" target="_blank" data-i18n="footerContact">Neem contact op via Discord</a>
+      </p>
+    </footer>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="upgrade.js"></script>
+</body>
+</html>

@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autoposter</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="onboarding.css">
+</head>
+<body>
+  <!-- Onboarding Overlay (hidden by default) -->
+  <div class="onboarding-overlay" id="onboardingOverlay" style="display: none;">
+    <div class="onboarding-content">
+      <button type="button" class="onboarding-lang-toggle" id="onboardingLangToggle" title="Switch language">🇬🇧</button>
+      <span class="welcome-emoji">👋</span>
+      <h2 data-i18n="welcomeTitle">Welcome to AutoPoster!</h2>
+      <p class="welcome-text" data-i18n="welcomeText">Learn in 3 steps how to create listings in seconds.</p>
+      
+      <div class="onboarding-steps">
+        <div class="onboarding-step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3 data-i18n="step1Title">Upload Photos</h3>
+            <p data-i18n="step1Desc">Drag or click to add product photos</p>
+          </div>
+        </div>
+        <div class="onboarding-step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3 data-i18n="step2Title">AI Analyzes</h3>
+            <p data-i18n="step2Desc">Our AI automatically fills all fields</p>
+          </div>
+        </div>
+        <div class="onboarding-step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3 data-i18n="step3Title">Copy & Paste</h3>
+            <p data-i18n="step3Desc">Click Vinted and paste on the marketplace</p>
+          </div>
+        </div>
+      </div>
+      
+      <button class="onboarding-start-btn" id="onboardingStartBtn" data-i18n="getStarted">Get Started!</button>
+    </div>
+  </div>
+
+  <!-- Limit Reached Modal -->
+  <div class="limit-modal-overlay" id="limitModal" style="display: none;">
+    <div class="limit-modal-content">
+      <span class="limit-modal-icon">⚠️</span>
+      <h3 data-i18n="limitReachedTitle">Maandlimiet bereikt</h3>
+      <p class="limit-modal-text" data-i18n="limitReachedText">Je hebt al je AI analyses voor deze maand gebruikt.</p>
+      <p class="limit-modal-cta" data-i18n="limitReachedUpgrade">Upgrade voor meer analyses!</p>
+      <div class="limit-modal-actions">
+        <button class="btn btn-primary" id="modalUpgradeBtn" data-i18n="upgradeNow">Upgrade nu</button>
+        <button class="btn btn-outline" id="modalCloseBtn" data-i18n="laterButton">Later</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Gallery Modal -->
+  <div class="gallery-modal-overlay" id="galleryModal" style="display: none;">
+    <div class="gallery-modal-content">
+      <button class="gallery-close" id="galleryClose">×</button>
+      <button class="gallery-nav gallery-prev" id="galleryPrev">‹</button>
+      <img class="gallery-image" id="galleryImage" src="" alt="">
+      <button class="gallery-nav gallery-next" id="galleryNext">›</button>
+      <div class="gallery-counter" id="galleryCounter">1 / 1</div>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Usage Banner -->
+    <div class="usage-banner" id="usageBanner" style="display: none;">
+      <div class="usage-info">
+        <span class="usage-text" id="usageText">0/3 AI analyses</span>
+        <div class="usage-bar">
+          <div class="usage-fill" id="usageFill" style="width: 0%"></div>
+        </div>
+      </div>
+      <button class="upgrade-btn-small" id="upgradeBtn" data-i18n="upgrade">Upgrade</button>
+    </div>
+
+    <header class="header">
+      <div class="header-controls">
+        <button id="themeToggle" class="btn-theme" title="Toggle theme">
+          ☀️
+        </button>
+        <button id="langToggle" class="btn-lang" title="Switch language">
+          🇳🇱
+        </button>
+        <button id="settingsBtn" class="btn-settings" title="Settings">
+          ⚙️
+        </button>
+      </div>
+      <div class="logo">
+        <img src="icons/icon48.png" alt="Autoposter Logo">
+        <h1>Autoposter</h1>
+      </div>
+      <p class="tagline" data-i18n="tagline">Smart Listing Prep Tool</p>
+    </header>
+
+    <form id="listingForm" class="form">
+      <!-- NEW: Intro Section -->
+      <section class="form-section intro-section">
+        <div class="intro-content">
+          <span class="intro-icon">📸</span>
+          <p class="intro-text" data-i18n="introText">Upload je foto's eerst. AutoPoster analyseert automatisch je product en vult alle velden voor je in.</p>
+        </div>
+      </section>
+
+      <!-- MOVED: Images Section (now FIRST) -->
+      <section class="form-section">
+        <h2 class="section-title" data-i18n="photos">Foto's</h2>
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-placeholder">
+            <span class="upload-icon">+</span>
+            <p data-i18n="uploadText">Klik of sleep foto's hier</p>
+            <small data-i18n="uploadLimit">Max 10 foto's (5MB per foto)</small>
+          </div>
+          <input type="file" id="imageInput" accept="image/*" multiple hidden>
+        </div>
+        <div class="image-previews" id="imagePreviews"></div>
+        
+        <div class="photo-actions">
+          <button type="button" id="analyzeImageBtn" class="btn btn-ai" disabled>
+            <span data-i18n="analyzePhoto">Analyseer Foto met AI</span>
+          </button>
+          <button type="button" id="clearFormBtn" class="btn btn-clear-small" title="Wis alles">
+            <span class="clear-icon">🗑️</span>
+            <span data-i18n="clearForm">Wis Formulier</span>
+          </button>
+        </div>
+        <p class="ai-hint" id="aiHint" data-i18n="aiHintNoPhoto">Upload een foto om AI analyse te activeren</p>
+      </section>
+
+      <!-- Product Info Section (now AFTER photos) -->
+      <section class="form-section">
+        <h2 class="section-title" data-i18n="productInfo">Product Info</h2>
+        
+        <div class="form-group">
+          <label for="title" data-i18n="title">Titel *</label>
+          <input type="text" id="title" name="title" data-placeholder="titlePlaceholder" placeholder="Bijv. Nike Air Max 90 - Maat 42" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="price" data-i18n="price">Prijs (€) *</label>
+            <input type="text" id="price" name="price" inputmode="decimal" pattern="[0-9.,]*" placeholder="25" required>
+          </div>
+          
+          <div class="form-group form-group-small">
+            <label for="quantity" data-i18n="quantity">Aantal</label>
+            <input type="number" id="quantity" name="quantity" min="1" max="999" value="1" class="quantity-input">
+          </div>
+          
+          <div class="form-group">
+            <label for="category" data-i18n="category">Categorie</label>
+            <!-- Hidden input to store selected category value -->
+            <input type="hidden" id="category" name="category" value="">
+            
+            <!-- Cascading Category Picker -->
+            <div class="category-picker" id="categoryPicker">
+              <!-- Category trigger button -->
+              <div class="category-trigger" id="categoryTrigger">
+                <span class="trigger-text" data-i18n="selectOption">Selecteer...</span>
+                <span class="trigger-arrow">▼</span>
+              </div>
+              
+              <!-- Dropdown content (hidden by default) -->
+              <div class="category-dropdown" id="categoryDropdown" style="display: none;">
+                <!-- Breadcrumb navigation -->
+                <div class="category-breadcrumb" id="categoryBreadcrumb">
+                  <span class="breadcrumb-item breadcrumb-root" data-level="root" data-i18n="category">Categorie</span>
+                </div>
+                
+                <!-- Category list -->
+                <div class="category-list" id="categoryList">
+                  <!-- Items will be populated by JS -->
+                </div>
+              </div>
+              
+              <!-- Selected category display -->
+              <div class="category-selected" id="categorySelected" style="display: none;">
+                <span class="selected-icon">✓</span>
+                <span class="selected-text" id="selectedCategoryText"></span>
+                <button type="button" class="btn-clear-category" id="clearCategoryBtn" title="Clear">×</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="condition" data-i18n="condition">Conditie</label>
+            <select id="condition" name="condition">
+              <option value="" data-i18n="selectOption">Selecteer...</option>
+              <option value="nieuw" data-i18n="condNew">Nieuw met labels</option>
+              <option value="nieuw_zonder" data-i18n="condNewNoTags">Nieuw zonder labels</option>
+              <option value="zeer_goed" data-i18n="condVeryGood">Zeer goed</option>
+              <option value="goed" data-i18n="condGood">Goed</option>
+              <option value="redelijk" data-i18n="condFair">Redelijk</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="tags" data-i18n="tags">Tags</label>
+            <input type="text" id="tags" name="tags" data-placeholder="tagsPlaceholder" placeholder="nike, sneakers, vintage">
+          </div>
+        </div>
+      </section>
+
+      <!-- Description Section -->
+      <section class="form-section">
+        <h2 class="section-title" data-i18n="description">Beschrijving</h2>
+        
+        <div class="form-group">
+          <label for="template" data-i18n="descriptionLabel">Beschrijving</label>
+          <textarea id="template" name="template" rows="4" data-placeholder="descriptionPlaceholder" placeholder="Beschrijf je product..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="additionalInfo" data-i18n="extraInfo">Extra Info</label>
+          <textarea id="additionalInfo" name="additionalInfo" rows="2" data-placeholder="extraInfoPlaceholder" placeholder="Maten, kleuren, defecten, etc."></textarea>
+        </div>
+
+        <div class="button-row">
+          <button type="button" id="generateAIBtn" class="btn btn-secondary">
+            <span data-i18n="generateAI">Genereer AI Beschrijving</span>
+          </button>
+          <button type="button" id="useTemplateBtn" class="btn btn-outline" style="display: none;">
+            <span data-i18n="useTemplate">Gebruik Template</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Platform Actions Section -->
+      <section class="form-section">
+        <h2 class="section-title" data-i18n="copyPost">Kopieer & Post</h2>
+        <p class="section-description" data-i18n="platformDescription">Klik op een platform om de listing te formatteren en kopiëren. Open daarna de marketplace om te plakken.</p>
+        
+        <div class="platform-grid">
+          <!-- Vinted -->
+          <div class="platform-card" data-platform="vinted">
+            <div class="platform-header">
+              <span class="platform-name">Vinted</span>
+            </div>
+            <div class="platform-actions">
+              <button type="button" class="btn btn-copy" data-platform="vinted">
+                <span data-i18n="copy">Kopieer</span>
+              </button>
+              <button type="button" class="btn btn-open" data-url="https://www.vinted.nl/items/new">
+                <span data-i18n="open">Open</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Marktplaats - Coming Soon -->
+          <div class="platform-card coming-soon" data-platform="marktplaats">
+            <div class="platform-header">
+              <span class="platform-name">Marktplaats</span>
+              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
+            </div>
+            <div class="platform-actions">
+              <button type="button" class="btn btn-copy" data-platform="marktplaats" disabled>
+                <span data-i18n="copy">Kopieer</span>
+              </button>
+              <button type="button" class="btn btn-open" data-url="https://www.marktplaats.nl/plaats" disabled>
+                <span data-i18n="open">Open</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Facebook Marketplace - Coming Soon -->
+          <div class="platform-card coming-soon" data-platform="facebook">
+            <div class="platform-header">
+              <span class="platform-name">Facebook</span>
+              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
+            </div>
+            <div class="platform-actions">
+              <button type="button" class="btn btn-copy" data-platform="facebook" disabled>
+                <span data-i18n="copy">Kopieer</span>
+              </button>
+              <button type="button" class="btn btn-open" data-url="https://www.facebook.com/marketplace/create/item" disabled>
+                <span data-i18n="open">Open</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Etsy - Coming Soon -->
+          <div class="platform-card coming-soon" data-platform="etsy">
+            <div class="platform-header">
+              <span class="platform-name">Etsy</span>
+              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
+            </div>
+            <div class="platform-actions">
+              <button type="button" class="btn btn-copy" data-platform="etsy" disabled>
+                <span data-i18n="copy">Kopieer</span>
+              </button>
+              <button type="button" class="btn btn-open" data-url="https://www.etsy.com/your/shops/me/tools/listings/create" disabled>
+                <span data-i18n="open">Open</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- eBay - Coming Soon -->
+          <div class="platform-card coming-soon" data-platform="ebay">
+            <div class="platform-header">
+              <span class="platform-name">eBay</span>
+              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
+            </div>
+            <div class="platform-actions">
+              <button type="button" class="btn btn-copy" data-platform="ebay" disabled>
+                <span data-i18n="copy">Kopieer</span>
+              </button>
+              <button type="button" class="btn btn-open" data-url="https://www.ebay.nl/sl/sell" disabled>
+                <span data-i18n="open">Open</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Admin Debug Panel (hidden by default, only for admins) -->
+      <section class="form-section debug-panel" id="debugPanel" style="display: none;">
+        <div class="debug-header">
+          <h2 class="section-title">🔧 Debug Panel (Admin Only)</h2>
+          <span class="debug-version" id="debugVersion"></span>
+          <button type="button" class="btn-debug-close" id="debugPanelClose">×</button>
+        </div>
+        
+        <!-- AI Analysis Stats -->
+        <div class="debug-section">
+          <h4>📊 AI Analysis</h4>
+          <div class="debug-stats">
+            <div class="debug-stat">
+              <span class="stat-label">Success Rate</span>
+              <span class="stat-value" id="debugSuccessRate">--%</span>
+            </div>
+            <div class="debug-stat">
+              <span class="stat-label">Total</span>
+              <span class="stat-value" id="debugTotalAnalyses">0</span>
+            </div>
+            <div class="debug-stat">
+              <span class="stat-label">Today</span>
+              <span class="stat-value" id="debugTodayCount">0</span>
+            </div>
+            <div class="debug-stat">
+              <span class="stat-label">Last Error</span>
+              <span class="stat-value stat-error" id="debugLastError">None</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Performance Stats -->
+        <div class="debug-section">
+          <h4>⚡ Performance</h4>
+          <div class="debug-stats">
+            <div class="debug-stat">
+              <span class="stat-label">Avg Time</span>
+              <span class="stat-value" id="debugAvgTime">--ms</span>
+            </div>
+            <div class="debug-stat">
+              <span class="stat-label">Fastest</span>
+              <span class="stat-value stat-success" id="debugFastest">--</span>
+            </div>
+            <div class="debug-stat">
+              <span class="stat-label">Slowest</span>
+              <span class="stat-value" id="debugSlowest">--</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Category Selection Stats -->
+        <div class="debug-section">
+          <h4>📁 Category Selection (Vinted)</h4>
+          <div class="debug-stats">
+            <div class="debug-stat">
+              <span class="stat-label">Success Rate</span>
+              <span class="stat-value" id="debugCategoryRate">--%</span>
+            </div>
+            <div class="debug-stat">
+              <span class="stat-label">Failures</span>
+              <span class="stat-value stat-error" id="debugCategoryErrors">0</span>
+            </div>
+            <div class="debug-stat">
+              <span class="stat-label">Most Used</span>
+              <span class="stat-value" id="debugMostUsedCategory">None</span>
+            </div>
+          </div>
+          <div class="debug-last-cat-error">
+            <span class="stat-label">Last Category Error:</span>
+            <div class="stat-value-block" id="debugLastCategoryError">None</div>
+          </div>
+        </div>
+        
+        <div class="debug-actions">
+          <button type="button" class="btn btn-outline btn-small" id="debugClearStats">Clear All Stats</button>
+          <button type="button" class="btn btn-outline btn-small" id="debugShowRaw">Show Raw Response</button>
+          <button type="button" class="btn btn-outline btn-small" id="debugExportStats">Export JSON</button>
+        </div>
+        
+        <div class="debug-raw-response" id="debugRawResponse" style="display: none;">
+          <pre id="debugRawContent">No response yet</pre>
+        </div>
+        
+        <!-- Category Error History -->
+        <div class="debug-history">
+          <h4>🔴 Recent Category Errors</h4>
+          <div class="debug-history-list" id="debugCategoryErrorList">
+            <p class="debug-empty">No category errors</p>
+          </div>
+        </div>
+        
+        <!-- Analysis History -->
+        <div class="debug-history">
+          <h4>📜 Analysis History (last 20)</h4>
+          <div class="debug-history-list" id="debugHistoryList">
+            <p class="debug-empty">No analyses yet</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Actions section removed - clear button moved to photo section -->
+    </form>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+    
+    <!-- Admin toggle (hidden keyboard shortcut: Ctrl+Shift+D) -->
+  </div>
+
+  <script src="categories.js"></script>
+  <script src="i18n.js"></script>
+  <script src="analytics.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

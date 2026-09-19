@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autoposter - Activate</title>
+  <link rel="stylesheet" href="license.css">
+</head>
+<body>
+  <div class="license-container">
+    <!-- Language Toggle -->
+    <button class="lang-toggle" id="langToggle" title="Switch language">🇳🇱</button>
+    
+    <div class="license-card">
+      <div class="logo">
+        <img src="icons/icon48.png" alt="Autoposter Logo">
+        <h1>Autoposter</h1>
+      </div>
+      
+      <p class="subtitle" id="subtitle" data-i18n="licenseSubtitle">Voer je license key in om de extensie te activeren.</p>
+      
+      <div class="input-group">
+        <input 
+          type="text" 
+          id="licenseKey" 
+          placeholder="XXXX-XXXX-XXXX"
+          autocomplete="off"
+          spellcheck="false"
+        >
+        <div class="error-message" id="errorMessage"></div>
+      </div>
+      
+      <button type="button" id="activateBtn" class="btn-activate">
+        <span id="activateBtnText" data-i18n="licenseActivate">Activeren</span>
+      </button>
+      
+      <div class="footer-text">
+        <p id="footerText">
+          <span data-i18n="licenseFooter">Geen license key?</span> 
+          <a href="https://autoposter.gumroad.com" target="_blank" data-i18n="licenseBuyOn">Koop er een op Gumroad</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
+  <script src="license.js"></script>
+</body>
+</html>
