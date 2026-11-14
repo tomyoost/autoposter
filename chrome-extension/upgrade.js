@@ -1,14 +1,5 @@
-// AutoPoster Pro - Upgrade Page
-
-const SUPABASE_URL = 'https://JOUW_PROJECT_ID.supabase.co';
-const VERIFY_LICENSE_URL = `${SUPABASE_URL}/functions/v1/verify-license`;
-
-// Tier limits for display
-const TIER_LIMITS = {
-  free: 3,
-  starter: 50,
-  pro: -1 // unlimited
-};
+// Autoposter - Upgrade Page
+// Needs config.js, i18n.js and license-api.js loaded first.
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -17,6 +8,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Load theme
   loadTheme();
+  
+  // Contact/feedback link comes from config.js
+  const feedbackLink = document.getElementById('feedbackLink');
+  if (feedbackLink) feedbackLink.href = AP_CONFIG.FEEDBACK_URL;
   
   // Update UI
   updateUI();
@@ -71,14 +66,19 @@ function setupEventListeners() {
     });
   }
   
-  // Upgrade buttons
+  // Upgrade buttons: one Gumroad membership product, the buyer picks Starter or Pro there
   document.querySelectorAll('.upgrade-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const tier = btn.dataset.tier;
-      const url = btn.dataset.url;
-      handleUpgrade(tier, url);
+      if (btn.disabled) return;
+      handleUpgrade();
     });
   });
+  
+  // Re-check the stored key after upgrading on Gumroad
+  const refreshPlanBtn = document.getElementById('refreshPlanBtn');
+  if (refreshPlanBtn) {
+    refreshPlanBtn.addEventListener('click', handleRefreshPlan);
+  }
   
   // License key activation
   const activateBtn = document.getElementById('activateLicenseBtn');
@@ -107,7 +107,7 @@ async function loadCurrentPlan() {
   if (!tierEl || !usageEl) return;
   
   if (result.licenseData) {
-    const data = result.licenseData;
+    const data = { ...result.licenseData, tier: result.licenseData.tier || 'free' };
     const tierName = t(`tier${data.tier.charAt(0).toUpperCase() + data.tier.slice(1)}`);
     tierEl.textContent = tierName;
     
@@ -120,7 +120,7 @@ async function loadCurrentPlan() {
     updateCardStates(data.tier || 'free');
   } else {
     tierEl.textContent = t('tierFree');
-    usageEl.textContent = '0/3';
+    usageEl.textContent = `0/${AP_CONFIG.TIER_LIMITS.free}`;
     updateCardStates('free');
   }
 }
@@ -138,6 +138,7 @@ function updateCardStates(currentTier) {
     
     btn.classList.remove('btn-primary', 'btn-secondary', 'btn-outline', 'current-btn', 'upgrade-btn');
     btn.disabled = false;
+    btn.style.visibility = '';
     card.classList.remove('current');
     
     if (cardTier === currentTier) {
@@ -156,88 +157,101 @@ function updateCardStates(currentTier) {
         btn.classList.add('btn-secondary');
       }
     } else {
-      btn.textContent = t('currentButton');
+      // Lower plan than the current one: no button (it is included in your plan)
+      btn.textContent = '';
       btn.disabled = true;
-      btn.classList.add('btn-outline');
+      btn.style.visibility = 'hidden';
     }
   });
 }
 
-function handleUpgrade(tier, url) {
-  chrome.tabs.create({ url });
+function handleUpgrade() {
+  chrome.tabs.create({ url: AP_CONFIG.GUMROAD.BUY_URL });
+}
+
+function showLicenseMessage(text, type) {
+  const messageEl = document.getElementById('licenseMessage');
+  messageEl.textContent = text;
+  messageEl.className = `license-message ${type}`;
 }
 
 async function handleActivateLicense() {
   const t = window.i18n.t;
   const input = document.getElementById('licenseKeyInput');
   const btn = document.getElementById('activateLicenseBtn');
-  const messageEl = document.getElementById('licenseMessage');
   
   // Check internet connection first
   if (!navigator.onLine) {
-    messageEl.textContent = t('noInternet') || 'Geen internetverbinding';
-    messageEl.className = 'license-message error';
+    showLicenseMessage(t('noInternet'), 'error');
     return;
   }
   
-  const licenseKey = input.value.trim().toUpperCase();
-  
-  if (!licenseKey || licenseKey.length < 8) {
-    messageEl.textContent = t('licenseInvalid') || 'Please enter a valid license key';
-    messageEl.className = 'license-message error';
+  // No format check here: Gumroad keys and manual keys are both valid, the server decides
+  const licenseKey = normalizeLicenseKey(input.value);
+  if (!licenseKey) {
+    showLicenseMessage(t('licenseErrEmpty'), 'error');
     return;
   }
   
   // Show loading state
   btn.disabled = true;
   btn.textContent = '...';
-  messageEl.textContent = '';
+  showLicenseMessage('', '');
   
   try {
-    const response = await fetch(VERIFY_LICENSE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey })
-    });
+    // refresh: true forces a fresh Gumroad check; stores licenseKey, licenseValidated and licenseData
+    const activation = await activateLicenseKey(licenseKey);
     
-    const data = await response.json();
-    
-    if (response.ok && data.valid) {
-      // Save license data with ALL required fields for popup.js compatibility
-      const licenseData = {
-        tier: data.tier,
-        usageCount: data.usageCount || 0,
-        usageLimit: data.usageLimit,  // Fixed: was data.tierLimit
-        usageLeft: data.usageLeft,
-        canUseAI: data.canUseAI,
-        expiresAt: data.expiresAt || null,
-        lastChecked: Date.now()
-      };
-      
-      // CRITICAL: Store licenseKey and licenseValidated so popup.js recognizes the new license
-      await chrome.storage.local.set({ 
-        licenseData,
-        licenseKey: licenseKey,
-        licenseValidated: true
-      });
-      
-      // Show success
-      messageEl.textContent = t('licenseChanged') || `License activated! Welcome to ${data.tier.toUpperCase()}`;
-      messageEl.className = 'license-message success';
+    if (activation.ok) {
+      showLicenseMessage(t('licenseChanged'), 'success');
       input.value = '';
-      
-      // Refresh the page to show new plan
       loadCurrentPlan();
     } else {
-      messageEl.textContent = data.error || t('licenseChangeFailed') || 'Invalid license key';
-      messageEl.className = 'license-message error';
+      // The previously stored key (if any) is left untouched
+      showLicenseMessage(licenseErrorMessage(activation.result, t), 'error');
     }
   } catch (error) {
     console.error('License activation error:', error);
-    messageEl.textContent = t('licenseChangeFailed') || 'Failed to activate license. Please try again.';
-    messageEl.className = 'license-message error';
+    showLicenseMessage(t('licenseNetworkError'), 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = t('activateLicense') || 'Activeren';
+    btn.textContent = t('activateLicense');
+  }
+}
+
+async function handleRefreshPlan() {
+  const t = window.i18n.t;
+  const btn = document.getElementById('refreshPlanBtn');
+  const { licenseKey } = await chrome.storage.local.get(['licenseKey']);
+  
+  if (!licenseKey) {
+    window.location.href = 'license.html';
+    return;
+  }
+  if (!navigator.onLine) {
+    showLicenseMessage(t('noInternet'), 'error');
+    return;
+  }
+  
+  btn.disabled = true;
+  try {
+    const activation = await activateLicenseKey(licenseKey);
+    if (activation.ok) {
+      showLicenseMessage(t('planRefreshed'), 'success');
+      loadCurrentPlan();
+    } else if (isLicenseRejected(activation.result)) {
+      // Server says this key is no longer valid: forget it and go back to the key screen
+      await chrome.storage.local.remove(['licenseValidated', 'licenseData', 'licenseKey']);
+      await chrome.storage.local.set({ licenseNotice: activation.result.data.error_code });
+      window.location.href = 'license.html';
+    } else {
+      // Network error or server trouble: keep the stored key
+      showLicenseMessage(licenseErrorMessage(activation.result, t), 'error');
+    }
+  } catch (error) {
+    console.error('Plan refresh error:', error);
+    showLicenseMessage(t('licenseNetworkError'), 'error');
+  } finally {
+    btn.disabled = false;
   }
 }

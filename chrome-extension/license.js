@@ -1,7 +1,5 @@
-// AutoPoster Pro - License Activation
-
-const SUPABASE_URL = 'https://JOUW_PROJECT_ID.supabase.co';
-const VERIFY_LICENSE_URL = `${SUPABASE_URL}/functions/v1/verify-license`;
+// Autoposter - License Activation (first screen)
+// Needs config.js, i18n.js and license-api.js loaded first.
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -11,11 +9,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load theme
   loadTheme();
   
+  // Gumroad links come from config.js
+  applyConfigLinks();
+  
   // Update UI
   updateUI();
   
   // Check existing license
   checkExistingLicense();
+  
+  // Explain why the user is back here (key was rejected by the server)
+  showLicenseNotice();
   
   // Setup event listeners
   setupEventListeners();
@@ -41,6 +45,21 @@ function updateUI() {
     const key = el.dataset.i18n;
     el.textContent = t(key);
   });
+}
+
+function applyConfigLinks() {
+  document.querySelectorAll('a[data-config-url]').forEach(link => {
+    const url = AP_CONFIG.GUMROAD[link.dataset.configUrl];
+    if (url) link.href = url;
+  });
+}
+
+async function showLicenseNotice() {
+  const { licenseNotice } = await chrome.storage.local.get(['licenseNotice']);
+  if (!licenseNotice) return;
+  const errorEl = document.getElementById('errorMessage');
+  errorEl.textContent = licenseErrorMessage({ status: 200, data: { error_code: licenseNotice } }, window.i18n.t);
+  await chrome.storage.local.remove(['licenseNotice']);
 }
 
 function setupEventListeners() {
@@ -84,33 +103,37 @@ async function handleActivation() {
   const btnText = document.getElementById('activateBtnText');
   const errorEl = document.getElementById('errorMessage');
   
-  const licenseKey = input.value.trim().toUpperCase();
+  const licenseKey = normalizeLicenseKey(input.value);
   
   if (!licenseKey) {
     input.classList.add('error');
-    errorEl.textContent = t('licenseInvalid');
+    errorEl.textContent = t('licenseErrEmpty');
+    return;
+  }
+  
+  if (!navigator.onLine) {
+    input.classList.add('error');
+    errorEl.textContent = t('noInternet');
     return;
   }
   
   // Show loading state
   btn.disabled = true;
   btnText.textContent = t('licenseActivating');
+  errorEl.textContent = '';
   
   try {
-    const isValid = await validateLicense(licenseKey);
+    // Forces a fresh Gumroad check (refresh: true) and stores key + licenseData on success
+    const activation = await activateLicenseKey(licenseKey);
     
-    if (isValid) {
+    if (activation.ok) {
       input.classList.remove('error');
       input.classList.add('success');
       btn.classList.add('success');
       btnText.textContent = t('licenseSuccess');
       
-      // Save license and show onboarding for new users
-      await chrome.storage.local.set({
-        licenseKey,
-        licenseValidated: true,
-        showOnboarding: true
-      });
+      // Show onboarding for new users
+      await chrome.storage.local.set({ showOnboarding: true });
       
       // Redirect after short delay
       setTimeout(() => {
@@ -118,51 +141,15 @@ async function handleActivation() {
       }, 1000);
     } else {
       input.classList.add('error');
-      errorEl.textContent = t('licenseInvalid');
+      errorEl.textContent = licenseErrorMessage(activation.result, t);
       btn.disabled = false;
       btnText.textContent = t('licenseActivate');
     }
   } catch (error) {
-    console.error('License validation error:', error);
+    console.error('License activation error:', error);
     input.classList.add('error');
-    errorEl.textContent = error.message || t('licenseInvalid');
+    errorEl.textContent = t('licenseNetworkError');
     btn.disabled = false;
     btnText.textContent = t('licenseActivate');
-  }
-}
-
-async function validateLicense(licenseKey) {
-  // Check internet connection first
-  if (!navigator.onLine) {
-    throw new Error(window.i18n.t('noInternet') || 'Geen internetverbinding');
-  }
-  
-  try {
-    const response = await fetch(VERIFY_LICENSE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey })
-    });
-    
-    const data = await response.json();
-    
-    if (data.valid) {
-      // Store license data
-      await chrome.storage.local.set({
-        licenseData: {
-          tier: data.tier,
-          usageCount: data.usageCount,
-          usageLimit: data.usageLimit,
-          usageLeft: data.usageLeft,
-          canUseAI: data.canUseAI
-        }
-      });
-      return true;
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('API error:', error);
-    throw new Error('Connection error. Please try again.');
   }
 }

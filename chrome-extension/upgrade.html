@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upgrade - AutoPoster Pro</title>
+  <title>Abonnement - Autoposter for Vinted</title>
   <link rel="stylesheet" href="popup.css">
   <link rel="stylesheet" href="upgrade.css">
 </head>
@@ -41,9 +41,9 @@
             <span class="feature-icon">✓</span>
             <span>3 <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
           </li>
-          <li class="feature-item disabled">
-            <span class="feature-icon">✗</span>
-            <span data-i18n="featureEmailSupport">Email support</span>
+          <li class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span>15 <span data-i18n="featureTexts">AI-teksten per maand</span></span>
           </li>
         </ul>
         <button class="btn btn-outline current-btn" disabled data-i18n="currentButton">Huidig plan</button>
@@ -67,10 +67,10 @@
           </li>
           <li class="feature-item">
             <span class="feature-icon">✓</span>
-            <span data-i18n="featureSupport48h">Email support (48u)</span>
+            <span>250 <span data-i18n="featureTexts">AI-teksten per maand</span></span>
           </li>
         </ul>
-        <button class="btn btn-primary upgrade-btn" data-tier="starter" data-url="https://autoposter.gumroad.com/l/starter">
+        <button class="btn btn-primary upgrade-btn" data-tier="starter">
           <span data-i18n="upgradeButton">Upgrade</span> <span data-i18n="tierStarter">Starter</span>
         </button>
       </div>
@@ -92,18 +92,15 @@
           </li>
           <li class="feature-item">
             <span class="feature-icon">✓</span>
-            <span data-i18n="featureSupport24h">Email support (24u)</span>
-          </li>
-          <li class="feature-item">
-            <span class="feature-icon">✓</span>
-            <span data-i18n="featureEarlyAccess">Vroegtijdige toegang tot nieuwe features</span>
+            <span data-i18n="featureUnlimitedTexts">Onbeperkt AI-teksten</span>
           </li>
         </ul>
-        <button class="btn btn-secondary upgrade-btn" data-tier="pro" data-url="https://autoposter.gumroad.com/l/pro">
+        <button class="btn btn-secondary upgrade-btn" data-tier="pro">
           <span data-i18n="upgradeButton">Upgrade</span> <span data-i18n="tierPro">Pro</span>
         </button>
       </div>
     </div>
+    <p class="license-desc buy-hint" data-i18n="upgradeBuyHint">Beide knoppen gaan naar dezelfde Gumroad-pagina. Daar kies je Starter of Pro.</p>
 
     <!-- License Key Section -->
     <div class="license-section">
@@ -114,21 +111,23 @@
           type="text" 
           id="licenseKeyInput" 
           class="license-key-input" 
-          placeholder="XXXX-XXXX-XXXX-XXXX"
-          maxlength="24"
+          placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+          maxlength="64"
           autocomplete="off"
           spellcheck="false"
         >
         <button id="activateLicenseBtn" class="btn btn-activate" data-i18n="activateLicense">Activeren</button>
       </div>
-      <p id="licenseMessage" class="license-message"></p>
+      <p id="licenseMessage" class="license-message" role="alert"></p>
+      <p class="license-desc refresh-plan-help" data-i18n="refreshPlanHelp">Al geüpgraded op Gumroad? Klik op 'Plan vernieuwen' om je nieuwe limiet op te halen.</p>
+      <button id="refreshPlanBtn" class="btn btn-outline" data-i18n="refreshPlan">Plan vernieuwen</button>
     </div>
 
     <div class="faq-section">
       <h3 data-i18n="faqTitle">Veelgestelde vragen</h3>
       <div class="faq-item">
         <strong data-i18n="faqKeyQuestion">Hoe krijg ik mijn license key?</strong>
-        <p data-i18n="faqKeyAnswer">Na aankoop ontvang je je license key per email. Voer deze hieronder in.</p>
+        <p data-i18n="faqKeyAnswer">Na het kopen staat je sleutel op je Gumroad-bon, in de bevestigingsmail en in je Gumroad-bibliotheek. Vul hem hieronder in.</p>
       </div>
       <div class="faq-item">
         <strong data-i18n="faqUpgradeQuestion">Kan ik op elk moment upgraden?</strong>
@@ -147,12 +146,14 @@
     <footer class="upgrade-footer">
       <p>
         <span data-i18n="footerQuestions">Vragen?</span> 
-        <a href="https://discord.gg/autoposter" target="_blank" data-i18n="footerContact">Neem contact op via Discord</a>
+        <a id="feedbackLink" target="_blank" rel="noopener" data-i18n="footerContact">Laat het ons weten via het feedbackformulier</a>
       </p>
     </footer>
   </div>
 
+  <script src="config.js"></script>
   <script src="i18n.js"></script>
+  <script src="license-api.js"></script>
   <script src="upgrade.js"></script>
 </body>
 </html>

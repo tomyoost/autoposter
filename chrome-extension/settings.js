@@ -1,9 +1,9 @@
 // AutoPoster Pro - Settings Page
 
-let currentPlatform = 'vinted';
+const currentPlatform = 'vinted';
 let templates = {};
 
-// Improved SEO-optimized example templates (NL)
+// Example templates (NL)
 const exampleTemplatesNL = {
   vinted: `{{title}} | {{condition}}
 
@@ -15,64 +15,10 @@ const exampleTemplatesNL = {
 ✓ Snelle verzending
 ✓ Vragen? Stuur een berichtje!
 
-{{tags}}`,
-
-  marktplaats: `{{title}}
-
-{{description}}
-
-━━━━━ PRODUCTDETAILS ━━━━━
-{{brand}} | {{color}} | {{size}} | {{condition}}
-
-✔ Ophalen of verzenden mogelijk
-✔ Snel antwoord op berichten
-✔ Bekijk ook mijn andere advertenties!
-
-Prijs: €{{price}}`,
-
-  facebook: `{{title}} | {{condition}}
-
-{{description}}
-
-{{brand}} {{color}} {{size}}
-
-€{{price}} ─ Stuur een bericht!
-✓ Lokaal ophalen mogelijk`,
-
-  etsy: `{{title}} - {{condition}}
-
-{{description}}
-
-━━━━━━ ITEM DETAILS ━━━━━━
-• Brand: {{brand}}
-• Color: {{color}}
-• Size: {{size}}
-• Material: {{material}}
-
-✓ Ships within 1-2 business days
-✓ Secure packaging
-✓ International shipping available
-
-Questions? Feel free to message me!`,
-
-  ebay: `{{title}} - {{condition}}
-
-{{description}}
-
-━━━━━━ SPECIFICATIONS ━━━━━━
-• Brand: {{brand}}
-• Color: {{color}}
-• Size: {{size}}
-• Material: {{material}}
-
-✓ Fast dispatch (1-2 business days)
-✓ Professional packaging
-✓ Worldwide shipping available
-
-Buy with confidence - check my feedback!`
+{{tags}}`
 };
 
-// Improved SEO-optimized example templates (EN)
+// Example templates (EN)
 const exampleTemplatesEN = {
   vinted: `{{title}} | {{condition}}
 
@@ -84,70 +30,12 @@ const exampleTemplatesEN = {
 ✓ Fast shipping
 ✓ Questions? Send me a message!
 
-{{tags}}`,
-
-  marktplaats: `{{title}}
-
-{{description}}
-
-━━━━━ PRODUCT DETAILS ━━━━━
-{{brand}} | {{color}} | {{size}} | {{condition}}
-
-✔ Pickup or shipping available
-✔ Quick response to messages
-✔ Check out my other listings!
-
-Price: €{{price}}`,
-
-  facebook: `{{title}} | {{condition}}
-
-{{description}}
-
-{{brand}} {{color}} {{size}}
-
-€{{price}} ─ Send me a message!
-✓ Local pickup available`,
-
-  etsy: `{{title}} - {{condition}}
-
-{{description}}
-
-━━━━━━ ITEM DETAILS ━━━━━━
-• Brand: {{brand}}
-• Color: {{color}}
-• Size: {{size}}
-• Material: {{material}}
-
-✓ Ships within 1-2 business days
-✓ Secure packaging
-✓ International shipping available
-
-Questions? Feel free to message me!`,
-
-  ebay: `{{title}} - {{condition}}
-
-{{description}}
-
-━━━━━━ SPECIFICATIONS ━━━━━━
-• Brand: {{brand}}
-• Color: {{color}}
-• Size: {{size}}
-• Material: {{material}}
-
-✓ Fast dispatch (1-2 business days)
-✓ Professional packaging
-✓ Worldwide shipping available
-
-Buy with confidence - check my feedback!`
+{{tags}}`
 };
 
-// Default templates (empty = use AI)
+// Default templates (empty = use AI). Only Vinted is supported.
 const defaultTemplates = {
-  vinted: '',
-  marktplaats: '',
-  facebook: '',
-  etsy: '',
-  ebay: ''
+  vinted: ''
 };
 
 // Initialize
@@ -155,13 +43,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   await window.i18n.loadLanguage();
   loadTemplates();
   loadCurrentPlan();
+  document.getElementById('manageSubscriptionBtn').href = AP_CONFIG.GUMROAD.LIBRARY_URL;
   setupEventListeners();
   updateLanguageButtons();
   translateUI();
 });
-
-const SUPABASE_URL = 'https://JOUW_PROJECT_ID.supabase.co';
-const VERIFY_LICENSE_URL = `${SUPABASE_URL}/functions/v1/verify-license`;
 
 function setupEventListeners() {
   // Back button
@@ -177,22 +63,6 @@ function setupEventListeners() {
       updateLanguageButtons();
       translateUI();
       showToast(lang === 'nl' ? 'Taal gewijzigd naar Nederlands' : 'Language changed to English', 'success');
-    });
-  });
-
-  // Template tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      // Save current template before switching
-      saveCurrentTemplate();
-      
-      // Switch tab
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentPlatform = btn.dataset.platform;
-      
-      // Load template for this platform
-      loadTemplateForPlatform();
     });
   });
 
@@ -245,8 +115,8 @@ function loadExampleTemplate() {
   templates[currentPlatform] = example;
   
   const msg = lang === 'nl' 
-    ? `Voorbeeld template geladen voor ${currentPlatform.charAt(0).toUpperCase() + currentPlatform.slice(1)}`
-    : `Example template loaded for ${currentPlatform.charAt(0).toUpperCase() + currentPlatform.slice(1)}`;
+    ? 'Voorbeeldsjabloon geladen'
+    : 'Example template loaded';
   showToast(msg, 'success');
 }
 
@@ -265,8 +135,8 @@ function translateUI() {
     'language': lang === 'nl' ? 'Taal' : 'Language',
     'templates': lang === 'nl' ? 'Templates' : 'Templates',
     'templatesDescription': lang === 'nl' 
-      ? 'Maak custom templates per platform. Lege placeholder regels worden automatisch verwijderd.'
-      : 'Create custom templates for each platform. Empty placeholder lines are automatically removed.',
+      ? 'Maak je eigen sjabloon voor de Vinted-beschrijving. Regels met een lege placeholder worden automatisch weggehaald.'
+      : 'Create your own template for the Vinted description. Lines with an empty placeholder are removed automatically.',
     'availablePlaceholders': lang === 'nl' ? 'Beschikbare placeholders:' : 'Available placeholders:',
     'saveTemplate': lang === 'nl' ? 'Template Opslaan' : 'Save Template',
     'useAI': lang === 'nl' ? 'Gebruik AI (geen template)' : 'Use AI (no template)',
@@ -294,6 +164,9 @@ function translateUI() {
     const key = el.dataset.i18n;
     if (i18nElements[key]) {
       el.textContent = i18nElements[key];
+    } else if (window.i18n.translations[lang]?.[key]) {
+      // Shared texts (subscription section) live in i18n.js
+      el.textContent = window.i18n.t(key);
     }
   });
 
@@ -348,7 +221,10 @@ function saveCurrentTemplate() {
 }
 
 function saveTemplates() {
-  chrome.storage.local.set({ customTemplates: templates });
+  chrome.storage.local.set({ customTemplates: templates }).catch((error) => {
+    console.error('Saving templates failed:', error);
+    showToast(window.i18n.t('storageFull'), 'error');
+  });
 }
 
 // Toast notification

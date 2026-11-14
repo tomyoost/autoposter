@@ -10,40 +10,50 @@
   <div class="license-container">
     <!-- Language Toggle -->
     <button class="lang-toggle" id="langToggle" title="Switch language">🇳🇱</button>
-    
+
     <div class="license-card">
       <div class="logo">
         <img src="icons/icon48.png" alt="Autoposter Logo">
         <h1>Autoposter</h1>
       </div>
-      
-      <p class="subtitle" id="subtitle" data-i18n="licenseSubtitle">Voer je license key in om de extensie te activeren.</p>
-      
+
+      <p class="subtitle" id="subtitle" data-i18n="licenseSubtitle">Vul je licentiesleutel in om Autoposter te activeren.</p>
+
       <div class="input-group">
-        <input 
-          type="text" 
-          id="licenseKey" 
-          placeholder="XXXX-XXXX-XXXX"
+        <input
+          type="text"
+          id="licenseKey"
+          placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
           autocomplete="off"
           spellcheck="false"
         >
-        <div class="error-message" id="errorMessage"></div>
+        <p class="key-hint" data-i18n="licenseKeyHint">Je sleutel staat op je Gumroad-bon, in de bevestigingsmail en in je Gumroad-bibliotheek.</p>
+        <div class="error-message" id="errorMessage" role="alert"></div>
       </div>
-      
+
       <button type="button" id="activateBtn" class="btn-activate">
         <span id="activateBtnText" data-i18n="licenseActivate">Activeren</span>
       </button>
-      
+
       <div class="footer-text">
-        <p id="footerText">
-          <span data-i18n="licenseFooter">Geen license key?</span> 
-          <a href="https://autoposter.gumroad.com" target="_blank" data-i18n="licenseBuyOn">Koop er een op Gumroad</a>
+        <p>
+          <span data-i18n="licenseNoKey">Nog geen sleutel?</span>
+          <a data-config-url="FREE_URL" target="_blank" rel="noopener" data-i18n="licenseStartFree">Start gratis (3 AI-analyses per maand)</a>
+        </p>
+        <p>
+          <a data-config-url="BUY_URL" target="_blank" rel="noopener" data-i18n="licenseBuy">Starter of Pro kopen</a>
+        </p>
+        <p>
+          <span data-i18n="licenseLostKey">Sleutel kwijt?</span>
+          <a data-config-url="LIBRARY_URL" target="_blank" rel="noopener" data-i18n="licenseInLibrary">Staat in je Gumroad-bibliotheek</a>
         </p>
       </div>
     </div>
   </div>
 
+  <script src="config.js"></script>
   <script src="i18n.js"></script>
+  <script src="license-api.js"></script>
   <script src="license.js"></script>
 </body>
 </html>

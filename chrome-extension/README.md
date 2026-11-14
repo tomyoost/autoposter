@@ -1,11 +1,10 @@
 # Autoposter - Chrome Extension
 
-A Chrome Extension (Manifest V3) that lets you create one listing and automatically post it across multiple marketplaces.
+A Chrome Extension (Manifest V3) for Vinted: AI reads your photos and fills in the title, description and category; you set the price. A "Paste" button on the Vinted sell page fills in the form.
 
 ## Features
 
 - **Single Listing Creation**: Fill out one form to create a listing
-- **Multi-Marketplace Support**: Vinted (more coming soon)
 - **Image Upload**: Support for 1-10 images with drag & drop
 - **AI Description Generation**: Generate descriptions using AI
 - **AI Photo Analysis**: Automatically extract product info from photos
@@ -64,6 +63,9 @@ A Chrome Extension (Manifest V3) that lets you create one listing and automatica
 ```
 chrome-extension/
 ├── manifest.json      # Extension configuration
+├── config.js          # AP_CONFIG: server URLs, Gumroad links, tier limits, DEV_MODE (load first!)
+├── license-api.js     # verify-license helpers (popup, license, upgrade pages)
+├── _locales/          # name + description for Chrome and the Web Store (en, nl)
 ├── popup.html         # Popup UI
 ├── popup.css          # Styles
 ├── popup.js           # Form handling & API calls
@@ -88,9 +90,10 @@ chrome-extension/
 
 ## Permissions
 
-- `activeTab`: Access current tab URL
-- `scripting`: For auto-fill features
-- `storage`: Save form data locally
+- `storage`: Save form data and photos locally
+- Host access to the 10 Vinted country sites (www.vinted.nl, .com, .fr, .de, .be, .es, .it, .pl, .pt, .co.uk) for the Paste button
+
+Set `DEV_MODE: true` in `config.js` only for local debugging (debug panel via Ctrl+Shift+D, verbose logs and a debug button on Vinted). It must be `false` in every store build.
 
 ## Troubleshooting
 
@@ -99,7 +102,7 @@ chrome-extension/
 - Check for errors in the manifest.json
 
 **Images not uploading?**
-- Check file size (max 1MB per image)
+- Check file size (max 15 MB per photo; photos are compressed to max 1600 px JPEG when added)
 - Ensure files are valid images (JPG, PNG, etc.)
 
 **AI features not working?**

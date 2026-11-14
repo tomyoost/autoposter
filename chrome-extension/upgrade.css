@@ -310,10 +310,10 @@
   border: 2px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: 14px;
   font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 0.5px;
   text-align: center;
   transition: all 0.2s ease;
 }
@@ -368,6 +368,15 @@
 
 .license-message.error {
   color: var(--error);
+}
+
+.refresh-plan-help {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.buy-hint {
+  text-align: center;
 }
 
 /* FAQ Section */

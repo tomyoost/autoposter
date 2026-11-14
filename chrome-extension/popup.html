@@ -13,7 +13,7 @@
     <div class="onboarding-content">
       <button type="button" class="onboarding-lang-toggle" id="onboardingLangToggle" title="Switch language">🇬🇧</button>
       <span class="welcome-emoji">👋</span>
-      <h2 data-i18n="welcomeTitle">Welcome to AutoPoster!</h2>
+      <h2 data-i18n="welcomeTitle">Welcome to Autoposter!</h2>
       <p class="welcome-text" data-i18n="welcomeText">Learn in 3 steps how to create listings in seconds.</p>
       
       <div class="onboarding-steps">
@@ -97,7 +97,7 @@
         <img src="icons/icon48.png" alt="Autoposter Logo">
         <h1>Autoposter</h1>
       </div>
-      <p class="tagline" data-i18n="tagline">Smart Listing Prep Tool</p>
+      <p class="tagline" data-i18n="tagline">Sneller verkopen op Vinted</p>
     </header>
 
     <form id="listingForm" class="form">
@@ -105,7 +105,7 @@
       <section class="form-section intro-section">
         <div class="intro-content">
           <span class="intro-icon">📸</span>
-          <p class="intro-text" data-i18n="introText">Upload je foto's eerst. AutoPoster analyseert automatisch je product en vult alle velden voor je in.</p>
+          <p class="intro-text" data-i18n="introText">Upload je foto's eerst. Autoposter analyseert automatisch je product en vult alle velden voor je in.</p>
         </div>
       </section>
 
@@ -237,7 +237,7 @@
       <!-- Platform Actions Section -->
       <section class="form-section">
         <h2 class="section-title" data-i18n="copyPost">Kopieer & Post</h2>
-        <p class="section-description" data-i18n="platformDescription">Klik op een platform om de listing te formatteren en kopiëren. Open daarna de marketplace om te plakken.</p>
+        <p class="section-description" data-i18n="platformDescription">Open Vinted vanuit hier en klik daar rechtsonder op 'Plakken'. Foto's, titel, beschrijving, prijs en categorie worden dan ingevuld.</p>
         
         <div class="platform-grid">
           <!-- Vinted -->
@@ -249,71 +249,7 @@
               <button type="button" class="btn btn-copy" data-platform="vinted">
                 <span data-i18n="copy">Kopieer</span>
               </button>
-              <button type="button" class="btn btn-open" data-url="https://www.vinted.nl/items/new">
-                <span data-i18n="open">Open</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Marktplaats - Coming Soon -->
-          <div class="platform-card coming-soon" data-platform="marktplaats">
-            <div class="platform-header">
-              <span class="platform-name">Marktplaats</span>
-              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
-            </div>
-            <div class="platform-actions">
-              <button type="button" class="btn btn-copy" data-platform="marktplaats" disabled>
-                <span data-i18n="copy">Kopieer</span>
-              </button>
-              <button type="button" class="btn btn-open" data-url="https://www.marktplaats.nl/plaats" disabled>
-                <span data-i18n="open">Open</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Facebook Marketplace - Coming Soon -->
-          <div class="platform-card coming-soon" data-platform="facebook">
-            <div class="platform-header">
-              <span class="platform-name">Facebook</span>
-              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
-            </div>
-            <div class="platform-actions">
-              <button type="button" class="btn btn-copy" data-platform="facebook" disabled>
-                <span data-i18n="copy">Kopieer</span>
-              </button>
-              <button type="button" class="btn btn-open" data-url="https://www.facebook.com/marketplace/create/item" disabled>
-                <span data-i18n="open">Open</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Etsy - Coming Soon -->
-          <div class="platform-card coming-soon" data-platform="etsy">
-            <div class="platform-header">
-              <span class="platform-name">Etsy</span>
-              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
-            </div>
-            <div class="platform-actions">
-              <button type="button" class="btn btn-copy" data-platform="etsy" disabled>
-                <span data-i18n="copy">Kopieer</span>
-              </button>
-              <button type="button" class="btn btn-open" data-url="https://www.etsy.com/your/shops/me/tools/listings/create" disabled>
-                <span data-i18n="open">Open</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- eBay - Coming Soon -->
-          <div class="platform-card coming-soon" data-platform="ebay">
-            <div class="platform-header">
-              <span class="platform-name">eBay</span>
-              <span class="coming-soon-badge" data-i18n="comingSoon">Coming Soon</span>
-            </div>
-            <div class="platform-actions">
-              <button type="button" class="btn btn-copy" data-platform="ebay" disabled>
-                <span data-i18n="copy">Kopieer</span>
-              </button>
-              <button type="button" class="btn btn-open" data-url="https://www.ebay.nl/sl/sell" disabled>
+              <button type="button" class="btn btn-open" data-platform="vinted">
                 <span data-i18n="open">Open</span>
               </button>
             </div>
@@ -321,7 +257,7 @@
         </div>
       </section>
 
-      <!-- Admin Debug Panel (hidden by default, only for admins) -->
+      <!-- Debug Panel (hidden; only available when AP_CONFIG.DEV_MODE is true, Ctrl+Shift+D) -->
       <section class="form-section debug-panel" id="debugPanel" style="display: none;">
         <div class="debug-header">
           <h2 class="section-title">🔧 Debug Panel (Admin Only)</h2>
@@ -427,11 +363,12 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
     
-    <!-- Admin toggle (hidden keyboard shortcut: Ctrl+Shift+D) -->
   </div>
 
+  <script src="config.js"></script>
   <script src="categories.js"></script>
   <script src="i18n.js"></script>
+  <script src="license-api.js"></script>
   <script src="analytics.js"></script>
   <script src="popup.js"></script>
 </body>

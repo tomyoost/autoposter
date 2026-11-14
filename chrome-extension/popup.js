@@ -1,23 +1,28 @@
 // Autoposter - Smart Listing Prep Tool
-// Edge function URLs
-const SUPABASE_URL = 'https://JOUW_PROJECT_ID.supabase.co';
-const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/generate-listing`;
-const ANALYZE_IMAGE_URL = `${SUPABASE_URL}/functions/v1/analyze-image`;
-const VERIFY_LICENSE_URL = `${SUPABASE_URL}/functions/v1/verify-license`;
+// Server URLs, Gumroad links, tier limits and DEV_MODE live in config.js (AP_CONFIG).
+// License helpers (verifyLicenseKey, licenseDataFromResponse, ...) live in license-api.js.
 const MAX_IMAGES = 10;
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB per image
-const MAX_SAVED_IMAGES = 10; // Store all 10 images
-const MAX_IMAGES_FOR_AI = 3; // Send up to 3 images to AI for better analysis
+const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15 MB per original photo; we compress before storing
+const IMAGE_MAX_SIDE = 1600; // px, longest side of a stored photo
+const IMAGE_JPEG_QUALITY = 0.85;
+const MAX_IMAGES_FOR_AI = 3; // the server only sends the first 3 photos to the AI
+const FORM_SAVE_DELAY = 400; // ms debounce for saving text fields
+const ANALYZE_TIMEOUT = 60000; // ms; the server stops AI work after about 40 s and answers well within this
 
-// Feedback form URL (Google Form)
-const FEEDBACK_URL = 'https://forms.gle/qgcvXNHsqoaGqoSY8';
+// Error codes from the API contract
+const LICENSE_ERROR_CODES = ['NO_LICENSE', 'INVALID_LICENSE', 'LICENSE_INACTIVE', 'LICENSE_EXPIRED', 'BAD_FORMAT'];
+const AI_RETRYABLE_CODES = ['AI_ERROR', 'AI_NO_CONTENT', 'AI_PARSE_FAIL', 'AI_RATE_LIMIT'];
+const IMAGE_ERROR_CODES = ['NO_IMAGE', 'INVALID_IMAGE', 'IMAGE_TOO_LARGE', 'INVALID_FORMAT', 'TOO_MANY_IMAGES', 'PAYLOAD_TOO_LARGE'];
 
-// License data
+// What "Plakken" on Vinted reads (besides savedImages). Must always describe the listing in the form.
+const PASTE_PAYLOAD_KEYS = ['lastFormattedText', 'lastTitle', 'lastPrice', 'lastPlatform', 'lastCategory', 'lastCategoryPath', 'lastListingId'];
+
+// License data (display only; the server decides what is allowed)
 let licenseData = {
   tier: 'free',
   usageCount: 0,
-  usageLimit: 3,
-  usageLeft: 3,
+  usageLimit: AP_CONFIG.TIER_LIMITS.free,
+  usageLeft: AP_CONFIG.TIER_LIMITS.free,
   canUseAI: true
 };
 
@@ -44,6 +49,15 @@ let autoAnalyzing = false;
 
 // Track if form was cleared (to reset all fields on new photo upload)
 let formWasCleared = false;
+
+// Identifies the listing in the form. A new id is made for every new listing (first photo, or "Wis Formulier").
+let currentListingId = null;
+
+// true when the paste payload in storage belongs to currentListingId
+let pastePayloadActive = false;
+
+// Pending debounced save of the text fields
+let formSaveTimer = null;
 
 // Debug stats tracking (for admin panel) - persisted in chrome.storage.local
 let debugStats = {
@@ -84,17 +98,8 @@ let debugStats = {
 
 const DEBUG_STATS_STORAGE_KEY = 'debugStats';
 
-// Admin mode flag (set via chrome.storage)
+// Debug panel flag. Only available when AP_CONFIG.DEV_MODE is true (Ctrl+Shift+D).
 let isAdminMode = false;
-
-// Admin license keys - only these keys can access debug panel
-// SECURITY: Only working database keys that also have admin access
-const ADMIN_LICENSE_KEYS = [
-  // Working test/dev keys from database (with admin privileges)
-  'FRE-7K9X2M4N-TEST',   // Free tier dev
-  'STR-8P3W6Y1Q-DEV',    // Starter tier dev
-  'PRO-4J2H9L5V-DEV'     // Pro tier dev
-];
 
 // Check license before initializing
 async function checkLicense() {
@@ -119,91 +124,75 @@ async function checkLicense() {
   });
 }
 
-// Refresh license data from server
+// Refresh license data from server (in the background, refresh: false = server may use its 6-hour cache)
 async function refreshLicenseData(licenseKey) {
   // Check internet connection first
   if (!navigator.onLine) {
-    console.log('Offline - skipping license refresh');
     return;
   }
   
-  try {
-    const response = await fetch(VERIFY_LICENSE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey })
-    });
-    
-    const data = await response.json();
-    
-    if (data.valid) {
-      licenseData = {
-        tier: data.tier,
-        usageCount: data.usageCount,
-        usageLimit: data.usageLimit,
-        usageLeft: data.usageLeft,
-        canUseAI: data.canUseAI
-      };
-      
-      // Update storage - CRITICAL: await to ensure persistence before UI refresh
-      await chrome.storage.local.set({ licenseData });
-      
-      // Update UI
-      updateUsageBanner();
-    } else {
-      // License no longer valid - remove ALL license keys to prevent stale state
-      await chrome.storage.local.remove(['licenseValidated', 'licenseData', 'licenseKey']);
-      window.location.href = 'license.html';
-    }
-  } catch (error) {
-    console.error('Failed to refresh license:', error);
-    // Use cached data
+  const result = await verifyLicenseKey(licenseKey, { refresh: false });
+  
+  if (isLicenseValid(result)) {
+    licenseData = licenseDataFromResponse(result.data, licenseData);
+    await safeStorageSet({ licenseData });
+    updateUsageBanner();
+  } else if (isLicenseRejected(result)) {
+    // Only a definite "this key is not valid" (200 + INVALID_LICENSE/LICENSE_INACTIVE/LICENSE_EXPIRED/BAD_FORMAT)
+    // may remove the stored key. Network errors, 5xx and 503 VERIFY_UNAVAILABLE keep it.
+    await chrome.storage.local.remove(['licenseValidated', 'licenseData', 'licenseKey']);
+    await safeStorageSet({ licenseNotice: result.data.error_code });
+    window.location.href = 'license.html';
+  } else {
+    console.warn('License refresh skipped (status ' + result.status + ' ' + (result.data.error_code || '') + '), using cached data');
   }
 }
 
-// Increment usage count
-async function incrementUsage() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['licenseKey'], async (result) => {
-      if (!result.licenseKey) {
-        resolve(false);
-        return;
-      }
-      
-      try {
-        const response = await fetch(VERIFY_LICENSE_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            licenseKey: result.licenseKey,
-            action: 'increment'
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.valid) {
-          licenseData = {
-            tier: data.tier,
-            usageCount: data.usageCount,
-            usageLimit: data.usageLimit,
-            usageLeft: data.usageLeft,
-            canUseAI: data.canUseAI
-          };
-          
-          // CRITICAL: await storage to prevent race conditions
-          await chrome.storage.local.set({ licenseData });
-          updateUsageBanner();
-          resolve(true);
-        } else {
-          resolve(false);
-        }
-      } catch (error) {
-        console.error('Failed to increment usage:', error);
-        resolve(false);
-      }
-    });
-  });
+// Update licenseData from the `usage` object the server returns (analyze-image 200 and 429 QUOTA_EXCEEDED).
+// Usage is only counted on the server.
+async function applyUsage(usage) {
+  if (!usage || typeof usage !== 'object') return;
+  licenseData = licenseDataFromResponse(usage, licenseData);
+  await safeStorageSet({ licenseData });
+  updateUsageBanner();
+}
+
+// A function answered 401/403 for the license: tell the user and let verify-license decide about the key.
+async function handleLicenseApiError() {
+  showToast(window.i18n.t('licenseProblem'), 'error', 6000);
+  const { licenseKey } = await chrome.storage.local.get(['licenseKey']);
+  if (licenseKey) {
+    await refreshLicenseData(licenseKey);
+  } else {
+    window.location.href = 'license.html';
+  }
+}
+
+// Localised message for a failed analyze-image / generate-listing call
+function apiErrorMessage(status, errorCode, context) {
+  const t = window.i18n.t;
+  if (errorCode === 'VERIFY_UNAVAILABLE') return t('serviceUnavailable');
+  if (errorCode === 'AI_RATE_LIMIT') return t('aiBusy');
+  if (errorCode === 'GENERATION_LIMIT') return t('generationLimit');
+  if (context === 'analyze' && IMAGE_ERROR_CODES.includes(errorCode)) return t('imageRejected');
+  if (status >= 500 && !String(errorCode).startsWith('AI_')) return t('serviceUnavailable');
+  return context === 'analyze' ? t('aiFailed') : t('generateFailed');
+}
+
+// Parse a JSON body without throwing (gateways can answer with HTML)
+async function readJson(response) {
+  try {
+    return (await response.json()) || {};
+  } catch {
+    return {};
+  }
+}
+
+// Error whose message is already a translated, user-facing text
+function userFacingError(message) {
+  const error = new Error(message);
+  error.userFacing = true;
+  return error;
 }
 
 // Update usage banner UI
@@ -313,6 +302,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Track extension opened
   if (typeof trackEvent === 'function') trackEvent('extension_opened');
 
+  // The popup can close any moment: write pending text changes right away when it is hidden
+  const flushIfPending = () => {
+    if (formSaveTimer) flushFormSave();
+  };
+  window.addEventListener('pagehide', flushIfPending);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushIfPending();
+  });
+
   // Live updates: keep popup UI in sync with stats written by content scripts
   // (e.g. Vinted category selection happens while popup is closed)
   chrome.storage.onChanged.addListener((changes, areaName) => {
@@ -332,40 +330,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-// Load admin mode from storage - only for admin license keys
+// Load debug panel state. Only possible in DEV_MODE builds.
 async function loadAdminMode() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['isAdminMode', 'licenseKey'], (result) => {
-      // Only enable admin mode if license key is in admin list
-      const isAdminLicense = ADMIN_LICENSE_KEYS.includes(result.licenseKey);
-      isAdminMode = isAdminLicense && (result.isAdminMode || false);
-      
-      // CRITICAL: Store admin status for content script to read
-      chrome.storage.local.set({ isAdminUser: isAdminLicense });
-      
-      resolve();
-    });
-  });
+  if (!AP_CONFIG.DEV_MODE) {
+    isAdminMode = false;
+    // Flags written by older versions; nothing reads them anymore
+    chrome.storage.local.remove(['isAdminMode', 'isAdminUser']);
+    return;
+  }
+  const result = await chrome.storage.local.get(['isAdminMode']);
+  isAdminMode = result.isAdminMode === true;
 }
 
-// Toggle admin mode (Ctrl+Shift+D) - only for admin license keys
+// Toggle debug panel (Ctrl+Shift+D) - DEV_MODE builds only
 function toggleAdminMode() {
-  chrome.storage.local.get(['licenseKey'], (result) => {
-    const isAdminLicense = ADMIN_LICENSE_KEYS.includes(result.licenseKey);
-    
-    if (!isAdminLicense) {
-      // Non-admin users cannot access debug panel
-      console.log('Admin features require admin license');
-      return;
-    }
-    
-    isAdminMode = !isAdminMode;
-    chrome.storage.local.set({ isAdminMode }, async () => {
-      // Ensure we render the latest persisted stats when the panel is opened.
-      await loadDebugStats();
-      updateDebugPanel();
-      showToast(isAdminMode ? 'Admin mode enabled' : 'Admin mode disabled', 'info');
-    });
+  if (!AP_CONFIG.DEV_MODE) return;
+  
+  isAdminMode = !isAdminMode;
+  chrome.storage.local.set({ isAdminMode }, async () => {
+    // Ensure we render the latest persisted stats when the panel is opened.
+    await loadDebugStats();
+    updateDebugPanel();
+    showToast(isAdminMode ? 'Admin mode enabled' : 'Admin mode disabled', 'info');
   });
 }
 
@@ -847,21 +833,20 @@ function setupEventListeners() {
     btn.addEventListener('click', () => handleCopyForPlatform(btn.dataset.platform));
   });
 
-  // Platform open buttons
+  // Open Vinted (writes the paste payload first)
   document.querySelectorAll('.btn-open').forEach(btn => {
-    btn.addEventListener('click', () => {
-      chrome.tabs.create({ url: btn.dataset.url });
-    });
+    btn.addEventListener('click', handleOpenVinted);
   });
 
   // Clear form
   clearFormBtn.addEventListener('click', clearForm);
 
-  // Auto-save on input change
-  const formInputs = document.querySelectorAll('input, textarea, select');
+  // Auto-save text fields (one shared debounce; photos are saved separately, only when they change)
+  const formInputs = document.querySelectorAll('#listingForm input, #listingForm textarea, #listingForm select');
   formInputs.forEach(input => {
-    input.addEventListener('change', debounce(saveFormData, 500));
-    input.addEventListener('input', debounce(saveFormData, 500));
+    if (input.type === 'file') return;
+    input.addEventListener('change', saveFormData);
+    input.addEventListener('input', saveFormData);
   });
   
   // Reset templateApplied when title changes (indicates new listing)
@@ -903,13 +888,15 @@ function setupEventListeners() {
     debugExportStats.addEventListener('click', exportDebugStats);
   }
   
-  // Admin mode keyboard shortcut: Ctrl+Shift+D
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-      e.preventDefault();
-      toggleAdminMode();
-    }
-  });
+  // Debug panel keyboard shortcut: Ctrl+Shift+D (DEV_MODE builds only)
+  if (AP_CONFIG.DEV_MODE) {
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        toggleAdminMode();
+      }
+    });
+  }
 }
 
 // Language toggle
@@ -991,77 +978,144 @@ function loadTemplates() {
   });
 }
 
-// Update template button visibility
+// Update template button visibility (only the Vinted template is used)
 function updateTemplateButton() {
   if (!useTemplateBtn) return;
   
-  // Check if any platform has a template
-  const hasAnyTemplate = Object.values(customTemplates).some(t => t && t.trim());
-  useTemplateBtn.style.display = hasAnyTemplate ? 'flex' : 'none';
+  const hasTemplate = Boolean(customTemplates.vinted && customTemplates.vinted.trim());
+  useTemplateBtn.style.display = hasTemplate ? 'flex' : 'none';
 }
 
 // Image handling
 function handleImageSelect(e) {
   handleFiles(e.target.files);
+  // Allow picking the same file again later
+  e.target.value = '';
 }
 
-function handleFiles(files) {
+// "photo.HEIC" -> "photo.jpg" (stored photos are always JPEG)
+function toJpegName(name) {
+  const base = String(name || 'photo').replace(/\.[^./\\]+$/, '');
+  return `${base || 'photo'}.jpg`;
+}
+
+// Shrink a photo before we keep it: longest side max IMAGE_MAX_SIDE px, JPEG quality IMAGE_JPEG_QUALITY.
+// Keeps chrome.storage.local (10 MB quota) and the AI upload small. Returns a JPEG data URL.
+async function compressImageBlob(blob) {
+  const bitmap = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+  try {
+    const scale = Math.min(1, IMAGE_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    // Transparent PNGs get a white background instead of black
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    return canvas.toDataURL('image/jpeg', IMAGE_JPEG_QUALITY);
+  } finally {
+    if (bitmap.close) bitmap.close();
+  }
+}
+
+async function handleFiles(files) {
   const t = window.i18n.t;
   const remainingSlots = MAX_IMAGES - uploadedImages.length;
-  const filesToProcess = Array.from(files).slice(0, remainingSlots);
+  const filesToProcess = Array.from(files).slice(0, Math.max(0, remainingSlots));
   const isFirstUpload = uploadedImages.length === 0;
-
-  // If form was cleared (all photos removed) and new photos are being uploaded,
-  // reset all AI-filled fields to allow fresh analysis
-  if (isFirstUpload && formWasCleared) {
-    resetAIFields();
-    formWasCleared = false;
-  }
-
-  filesToProcess.forEach(file => {
-    if (!file.type.startsWith('image/')) {
-      showToast(t('onlyImages'), 'error');
-      return;
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      showToast(`${file.name} ${t('fileTooLarge')} (max 5MB)`, 'error');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      uploadedImages.push({
-        name: file.name,
-        data: e.target.result
-      });
-      if (typeof trackEvent === 'function') trackEvent('photos_uploaded', { count: uploadedImages.length });
-      });
-      renderImagePreviews();
-      saveFormData();
-      
-      // AUTO-ANALYZE: If first image uploaded, automatically start analysis
-      if (isFirstUpload && uploadedImages.length === 1 && !autoAnalyzing) {
-        autoAnalyzing = true;
-        showToast(t('autoAnalyzing'), 'info');
-        
-        // Small delay to let UI update
-        setTimeout(async () => {
-          await handleAnalyzeImage();
-          autoAnalyzing = false;
-        }, 500);
-      }
-    };
-    reader.readAsDataURL(file);
-  });
 
   if (files.length > remainingSlots) {
     showToast(`Max ${MAX_IMAGES} ${t('maxPhotos')}`, 'info');
   }
+  if (filesToProcess.length === 0) return;
+
+  // First photo(s) in an empty form = a new listing
+  if (isFirstUpload) {
+    // If form was cleared (all photos removed) and new photos are being uploaded,
+    // reset all AI-filled fields to allow fresh analysis
+    if (formWasCleared) {
+      resetAIFields();
+      formWasCleared = false;
+    }
+    // Text of a previous listing may never be pasted together with these new photos
+    startNewListing();
+    saveFormData();
+  }
+
+  let added = 0;
+  // One by one, to keep memory use low with large phone photos
+  for (const file of filesToProcess) {
+    if (!file.type.startsWith('image/')) {
+      showToast(t('onlyImages'), 'error');
+      continue;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      showToast(`${file.name} ${t('fileTooLarge')} (max 15 MB)`, 'error');
+      continue;
+    }
+
+    let data;
+    try {
+      data = await compressImageBlob(file);
+    } catch (error) {
+      console.error('Could not read photo:', file.name, error);
+      showToast(`${file.name} ${t('imageReadFailed')}`, 'error');
+      continue;
+    }
+
+    if (uploadedImages.length >= MAX_IMAGES) break;
+    uploadedImages.push({ name: toJpegName(file.name), data, compressed: true });
+    added++;
+    renderImagePreviews();
+    await saveImages();
+  }
+
+  if (added === 0) return;
+  if (typeof trackEvent === 'function') trackEvent('photos_uploaded', { count: uploadedImages.length });
+
+  // AUTO-ANALYZE: first photos of a new listing are ready, start the analysis
+  if (isFirstUpload && !autoAnalyzing) {
+    autoAnalyzing = true;
+    showToast(t('autoAnalyzing'), 'info');
+    try {
+      await handleAnalyzeImage();
+    } finally {
+      autoAnalyzing = false;
+    }
+  }
 }
 
-// Reset AI-filled fields (called when uploading new photos after clearing)
+// Photos saved by version 1.0.x are uncompressed and can fill the 10 MB storage quota: shrink them once.
+async function shrinkLegacyImages() {
+  let changed = false;
+  for (const img of uploadedImages) {
+    if (img.compressed || typeof img.data !== 'string' || !img.data.startsWith('data:image/')) continue;
+    try {
+      const blob = await (await fetch(img.data)).blob();
+      img.data = await compressImageBlob(blob);
+      img.name = toJpegName(img.name);
+      img.compressed = true;
+      changed = true;
+    } catch (error) {
+      console.warn('Could not shrink saved photo:', error);
+    }
+  }
+  if (changed) {
+    renderImagePreviews();
+    await saveImages();
+  }
+}
+
+// Reset listing fields (called when uploading new photos after all photos were removed = new listing)
 function resetAIFields() {
   document.getElementById('title').value = '';
+  document.getElementById('price').value = '';
+  document.getElementById('template').value = '';
   document.getElementById('condition').value = '';
   document.getElementById('tags').value = '';
   document.getElementById('additionalInfo').value = '';
@@ -1134,7 +1188,7 @@ function renderImagePreviews() {
       const [moved] = uploadedImages.splice(fromIndex, 1);
       uploadedImages.splice(toIndex, 0, moved);
       renderImagePreviews();
-      saveFormData();
+      saveImages();
     });
     
     imagePreviews.appendChild(preview);
@@ -1155,7 +1209,7 @@ function renderImagePreviews() {
       const index = parseInt(e.target.dataset.index);
       uploadedImages.splice(index, 1);
       renderImagePreviews();
-      saveFormData();
+      saveImages();
       updateAnalyzeButton();
       
       // If all images are removed, set flag so next upload resets AI fields
@@ -1280,44 +1334,10 @@ function updateAnalyzeButton() {
   }
 }
 
-// Compress image for AI analysis - HIGHER QUALITY for label reading
-async function compressImageForAI(base64Data, maxWidth = 1800, quality = 0.92) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-      
-      // Only scale down if significantly larger than target
-      // Keep more detail for label/tag reading
-      if (width > maxWidth) {
-        height = (height * maxWidth) / width;
-        width = maxWidth;
-      }
-      
-      canvas.width = width;
-      canvas.height = height;
-      
-      const ctx = canvas.getContext('2d');
-      // Use higher quality interpolation
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, width, height);
-      
-      // Convert to JPEG with higher quality
-      const compressed = canvas.toDataURL('image/jpeg', quality);
-      resolve(compressed);
-    };
-    img.onerror = () => resolve(base64Data); // fallback to original
-    img.src = base64Data;
-  });
-}
-
-// AI Image Analysis with auto-retry and multi-image support
+// AI Image Analysis (multi-image). Usage is counted on the server; we only show what it reports.
 async function handleAnalyzeImage(retryCount = 0) {
   const t = window.i18n.t;
-  const MAX_RETRIES = 2;
+  const MAX_RETRIES = 1; // the server already retries the AI call itself
   const startTime = Date.now();
   
   // Check internet connection first
@@ -1331,85 +1351,94 @@ async function handleAnalyzeImage(retryCount = 0) {
     return;
   }
 
-  // Check usage limits - show modal instead of redirect
-  if (!licenseData.canUseAI) {
-    showLimitModal();
-    if (typeof trackEvent === 'function') trackEvent('limit_reached');
-    return;
-  }
-
-  if (typeof trackEvent === 'function') trackEvent('ai_analysis_started', { imageCount: uploadedImages.length });
+  if (retryCount === 0 && typeof trackEvent === 'function') trackEvent('ai_analysis_started', { imageCount: uploadedImages.length });
   analyzeImageBtn.disabled = true;
   analyzeImageBtn.classList.add('loading');
   analyzeImageBtn.classList.add('auto-analyzing');
   
   if (retryCount > 0) {
-    analyzeImageBtn.innerHTML = `<span class="btn-icon">🔄</span> Retry ${retryCount}/${MAX_RETRIES}...`;
+    analyzeImageBtn.innerHTML = `<span class="btn-icon">🔄</span> ${t('analyzing')}`;
   } else {
     analyzeImageBtn.innerHTML = `<span class="btn-icon">🔍</span> ${t('analyzing')}`;
   }
 
   try {
-    // Compress multiple images for AI (up to MAX_IMAGES_FOR_AI)
-    const imagesToSend = uploadedImages.slice(0, MAX_IMAGES_FOR_AI);
-    const compressedImages = await Promise.all(
-      imagesToSend.map(img => compressImageForAI(img.data))
-    );
-    
-    // Create AbortController for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 second timeout
-    
     // Get license key for authenticated API calls
-    const { licenseKey: storedKey, licenseValidated } = await chrome.storage.local.get(['licenseKey', 'licenseValidated']);
+    const { licenseKey: storedKey } = await chrome.storage.local.get(['licenseKey']);
     
     if (!storedKey) {
       // No license key found - redirect to license page
-      console.error('No license key in storage. licenseValidated:', licenseValidated);
       window.location.href = 'license.html';
       return;
     }
     
-    const response = await fetch(ANALYZE_IMAGE_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-License-Key': storedKey,
-      },
-      body: JSON.stringify({
-        images: compressedImages,
-        language: window.i18n.getCurrentLanguage()
-      }),
-      signal: controller.signal
-    });
+    // Photos are already compressed when added; the server only uses the first 3
+    const imagesToSend = uploadedImages.slice(0, MAX_IMAGES_FOR_AI).map(img => img.data);
     
-    clearTimeout(timeoutId);
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT);
+    
+    let response;
+    try {
+      response = await fetch(AP_CONFIG.ANALYZE_IMAGE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-License-Key': storedKey,
+        },
+        body: JSON.stringify({
+          images: imagesToSend,
+          language: window.i18n.getCurrentLanguage()
+        }),
+        signal: controller.signal
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
-    const data = await response.json();
+    const data = await readJson(response);
     const responseTime = Date.now() - startTime;
 
     if (!response.ok) {
-      const errorCode = data.error_code || 'UNKNOWN';
-      const isRetryable = ['AI_NO_CONTENT', 'AI_PARSE_FAIL', 'AI_ERROR'].includes(errorCode);
+      const errorCode = data.error_code || `HTTP_${response.status}`;
       
       // Record failed attempt
       recordAnalysisResult(false, null, errorCode, responseTime, data);
       if (typeof trackEvent === 'function') trackEvent('ai_analysis_failed', { errorCode, responseTime });
       
-      if (isRetryable && retryCount < MAX_RETRIES) {
-        console.log(`AI analysis failed with ${errorCode}, retrying (${retryCount + 1}/${MAX_RETRIES})...`);
-        showToast(`AI error, retrying (${retryCount + 1}/${MAX_RETRIES})...`, 'info');
-        
-        await new Promise(r => setTimeout(r, 1000 * (retryCount + 1)));
-        
-        analyzeImageBtn.disabled = false;
-        analyzeImageBtn.classList.remove('loading');
-        analyzeImageBtn.classList.remove('auto-analyzing');
-        
-        return handleAnalyzeImage(retryCount + 1);
+      // Monthly limit reached (nothing was counted): update the banner and show the limit modal
+      if (errorCode === 'QUOTA_EXCEEDED') {
+        if (data.usage) {
+          await applyUsage(data.usage);
+        } else {
+          licenseData = { ...licenseData, canUseAI: false, usageLeft: 0 };
+          updateUsageBanner();
+        }
+        showLimitModal();
+        if (typeof trackEvent === 'function') trackEvent('limit_reached');
+        return;
       }
       
-      throw new Error(data.error || 'AI analysis failed');
+      if (LICENSE_ERROR_CODES.includes(errorCode)) {
+        await handleLicenseApiError();
+        return;
+      }
+      
+      // AI hiccup (nothing was counted): try once more
+      if (AI_RETRYABLE_CODES.includes(errorCode) && retryCount < MAX_RETRIES) {
+        showToast(t('aiRetrying'), 'info');
+        await new Promise(r => setTimeout(r, errorCode === 'AI_RATE_LIMIT' ? 3000 : 1500));
+        return await handleAnalyzeImage(retryCount + 1);
+      }
+      
+      showToast(apiErrorMessage(response.status, errorCode, 'analyze'), 'error', 6000);
+      return;
+    }
+
+    // One analysis was counted on the server; show the new numbers
+    if (data.usage) {
+      await applyUsage(data.usage);
     }
 
     if (data.analysis) {
@@ -1419,7 +1448,7 @@ async function handleAnalyzeImage(retryCount = 0) {
       // Auto-reorder photos based on AI scoring
       const reordered = autoReorderPhotos(repairedAnalysis.photoOrder);
       if (reordered) {
-        showToast(t('photoAnalyzedAndReordered') || (window.i18n.getCurrentLanguage() === 'nl' ? '📸 Geanalyseerd & foto\'s gerangschikt!' : '📸 Analyzed & photos arranged!'), 'success');
+        showToast(t('photoAnalyzedAndReordered'), 'success');
       } else {
         showToast(t('photoAnalyzed'), 'success');
       }
@@ -1427,8 +1456,13 @@ async function handleAnalyzeImage(retryCount = 0) {
       // Record success with category path
       recordAnalysisResult(true, repairedAnalysis.suggestedTitle, null, responseTime, data, repairedAnalysis.categoryPath);
       if (typeof trackEvent === 'function') trackEvent('ai_analysis_completed', { responseTime, category: repairedAnalysis.categoryPath });
-      
-      await incrementUsage();
+
+      // Fill the description too, unless the user already wrote one or uses an own template
+      const hasOwnText = document.getElementById('template').value.trim()
+        || (customTemplates.vinted && customTemplates.vinted.trim());
+      if (!hasOwnText && document.getElementById('title').value.trim()) {
+        await handleGenerateAI();
+      }
     }
   } catch (error) {
     const responseTime = Date.now() - startTime;
@@ -1437,9 +1471,12 @@ async function handleAnalyzeImage(retryCount = 0) {
     recordAnalysisResult(false, null, error.name === 'AbortError' ? 'TIMEOUT' : 'ERROR', responseTime, { error: error.message });
     
     if (error.name === 'AbortError') {
-      showToast(t('analysisTimeout') || 'Analysis timeout, try again', 'error');
+      showToast(t('analysisTimeout'), 'error');
+    } else if (error instanceof TypeError) {
+      // fetch() itself failed: no connection to the server
+      showToast(t('licenseNetworkError'), 'error', 6000);
     } else {
-      showToast(error.message || 'Could not analyze photo', 'error');
+      showToast(t('aiFailed'), 'error', 6000);
     }
   } finally {
     analyzeImageBtn.disabled = false;
@@ -1545,7 +1582,7 @@ function autoReorderPhotos(photoOrder) {
   
   uploadedImages = reordered;
   renderImagePreviews();
-  saveFormData();
+  saveImages();
   
   console.log('Photos auto-reordered:', sorted.map(p => `#${p.imageIndex} ${p.type}(${p.score})`).join(', '));
   return true;
@@ -1644,9 +1681,13 @@ function applyAnalysisResults(analysis) {
   let detectedCategoryValue = '';
   if (analysis.category) {
     // Build category path from AI response
-    const categoryPath = analysis.subcategory 
-      ? `${analysis.category} > ${analysis.subcategory}`
-      : analysis.category;
+    const sub = (analysis.subcategory || '').trim();
+    const main = analysis.category.trim();
+    const categoryPath = !sub
+      ? main
+      : sub.toLowerCase().startsWith(main.toLowerCase() + ' >')
+        ? sub
+        : `${main} > ${sub}`;
     
     // Store in analysis data
     analysisData.categoryPath = categoryPath;
@@ -1762,6 +1803,7 @@ function getFormData() {
   const quantity = quantityInput ? parseInt(quantityInput.value, 10) || 1 : 1;
   
   return {
+    listingId: currentListingId,
     title: document.getElementById('title').value.trim(),
     price: cleanPrice,
     category: document.getElementById('category').value,
@@ -1887,18 +1929,8 @@ async function handleUseTemplate() {
     return;
   }
 
-  // Find a template (check all platforms, prefer vinted)
-  const platforms = ['vinted', 'marktplaats', 'facebook', 'etsy', 'ebay'];
-  let templateToUse = '';
-  let platformUsed = '';
-  
-  for (const platform of platforms) {
-    if (customTemplates[platform] && customTemplates[platform].trim()) {
-      templateToUse = customTemplates[platform];
-      platformUsed = platform;
-      break;
-    }
-  }
+  // Only the Vinted template is used (older versions also stored templates for other sites)
+  const templateToUse = (customTemplates.vinted && customTemplates.vinted.trim()) ? customTemplates.vinted : '';
   
   if (!templateToUse) {
     showToast(t('noTemplate'), 'error');
@@ -1910,11 +1942,7 @@ async function handleUseTemplate() {
   templateApplied = true; // Mark that template was applied
   saveFormData();
   
-  const lang = window.i18n.getCurrentLanguage();
-  const msg = lang === 'nl' 
-    ? `Template toegepast (${platformUsed})`
-    : `Template applied (${platformUsed})`;
-  showToast(msg, 'success');
+  showToast(t('templateApplied'), 'success');
 }
 
 // AI Description Generation
@@ -1933,7 +1961,7 @@ async function handleGenerateAI() {
 
   try {
     const { licenseKey: storedKeyGen } = await chrome.storage.local.get(['licenseKey']);
-    const response = await fetch(EDGE_FUNCTION_URL, {
+    const response = await fetch(AP_CONFIG.GENERATE_LISTING_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1942,14 +1970,22 @@ async function handleGenerateAI() {
       body: JSON.stringify({
         action: 'generate_description',
         listing: formData,
+        platform: 'vinted',
         language: window.i18n.getCurrentLanguage()
       })
     });
 
-    const data = await response.json();
+    const data = await readJson(response);
 
     if (!response.ok) {
-      throw new Error(data.error || 'AI generatie mislukt');
+      const errorCode = data.error_code || `HTTP_${response.status}`;
+      if (LICENSE_ERROR_CODES.includes(errorCode)) {
+        await handleLicenseApiError();
+        return;
+      }
+      // e.g. 429 GENERATION_LIMIT: monthly limit for AI texts reached
+      showToast(apiErrorMessage(response.status, errorCode, 'generate'), 'error', 6000);
+      return;
     }
 
     if (data.description) {
@@ -1959,7 +1995,7 @@ async function handleGenerateAI() {
     }
   } catch (error) {
     console.error('AI generation error:', error);
-    showToast(error.message || 'Kon beschrijving niet genereren', 'error');
+    showToast(error instanceof TypeError ? t('licenseNetworkError') : t('generateFailed'), 'error', 6000);
   } finally {
     generateAIBtn.disabled = false;
     generateAIBtn.classList.remove('loading');
@@ -1983,6 +2019,7 @@ async function handleCopyForPlatform(platform) {
 
   try {
     let clipboardText = '';
+    let pasteText = null; // text for Vinted's description field (defaults to clipboardText)
     
     // FIXED: Always prioritize existing description if it has content
     const currentDescription = formData.template || '';
@@ -1996,7 +2033,7 @@ async function handleCopyForPlatform(platform) {
     } else {
       // No description AND no template - only then use AI
       const { licenseKey: storedKeyPlatform } = await chrome.storage.local.get(['licenseKey']);
-      const response = await fetch(EDGE_FUNCTION_URL, {
+      const response = await fetch(AP_CONFIG.GENERATE_LISTING_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2010,25 +2047,28 @@ async function handleCopyForPlatform(platform) {
         })
       });
 
-      const data = await response.json();
+      const data = await readJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Formatteren mislukt');
+        const errorCode = data.error_code || `HTTP_${response.status}`;
+        if (LICENSE_ERROR_CODES.includes(errorCode)) {
+          await handleLicenseApiError();
+          throw userFacingError(t('licenseProblem'));
+        }
+        // e.g. 429 GENERATION_LIMIT: monthly limit for AI texts reached
+        throw userFacingError(apiErrorMessage(response.status, errorCode, 'generate'));
       }
       
-      // For AI generation, add title separately since AI response is just description
-      clipboardText = formData.title + '\n\n' + (data.description || '');
+      // The clipboard gets title + description; Vinted's description field only the description
+      pasteText = data.description || '';
+      clipboardText = formData.title + '\n\n' + pasteText;
+      if (pasteText) {
+        document.getElementById('template').value = pasteText;
+      }
     }
     
-    // Save for content script auto-paste (with category path for autofill)
-    chrome.storage.local.set({ 
-      lastFormattedText: clipboardText,
-      lastTitle: formData.title,
-      lastPrice: formData.price,
-      lastPlatform: platform,
-      lastCategory: getCategoryText(formData.category),
-      lastCategoryPath: formData.categoryPath || analysisData.categoryPath || ''
-    });
+    // Save for content script auto-paste (this listing only, with category path for autofill)
+    await writePastePayload(pasteText !== null ? pasteText : clipboardText);
 
     // Copy to clipboard
     await navigator.clipboard.writeText(clipboardText);
@@ -2045,28 +2085,124 @@ async function handleCopyForPlatform(platform) {
 
   } catch (error) {
     console.error('Copy error:', error);
-    showToast(error.message || 'Kopiëren mislukt', 'error');
+    showToast(error.userFacing ? error.message : t('copyFailed'), 'error', 6000);
     copyBtn.innerHTML = `<span data-i18n="copy">${t('copy')}</span>`;
     copyBtn.disabled = false;
   }
 }
 
-// Form persistence
-function saveFormData() {
-  const data = getFormData();
-  
-  // Save images (limited to MAX_SAVED_IMAGES to avoid storage limits)
-  const imagesToSave = uploadedImages.slice(0, MAX_SAVED_IMAGES);
-  
-  chrome.storage.local.set({ 
-    listingData: data,
-    savedImages: imagesToSave,
-    analysisData: analysisData
+// ============================================
+// STORAGE (chrome.storage.local has a 10 MB quota)
+// ============================================
+
+let lastStorageErrorToast = 0;
+
+// Never fail silently: a failed write (usually a full quota) gets a toast.
+async function safeStorageSet(items) {
+  try {
+    await chrome.storage.local.set(items);
+    return true;
+  } catch (error) {
+    console.error('Saving to chrome.storage.local failed:', error);
+    if (Date.now() - lastStorageErrorToast > 5000) {
+      lastStorageErrorToast = Date.now();
+      showToast(window.i18n.t('storageFull'), 'error', 6000);
+    }
+    return false;
+  }
+}
+
+function newListingId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// A new listing starts: forget the paste payload of the previous one
+function startNewListing() {
+  currentListingId = newListingId();
+  clearPastePayload();
+}
+
+function clearPastePayload() {
+  pastePayloadActive = false;
+  chrome.storage.local.remove(PASTE_PAYLOAD_KEYS).catch((error) => {
+    console.error('Could not clear paste payload:', error);
   });
 }
 
+// Text that goes into the Vinted description: the description field, else the Vinted template
+function currentPasteText(formData) {
+  if (formData.template) return formData.template;
+  if (customTemplates.vinted && customTemplates.vinted.trim()) {
+    return applyTemplate(customTemplates.vinted, formData);
+  }
+  return '';
+}
+
+function buildPastePayload(formData, formattedText) {
+  const payload = {
+    lastListingId: formData.listingId,
+    lastTitle: formData.title,
+    lastPrice: formData.price,
+    lastPlatform: 'vinted',
+    lastCategory: getCategoryText(formData.category),
+    lastCategoryPath: formData.categoryPath || analysisData.categoryPath || ''
+  };
+  if (formattedText) {
+    payload.lastFormattedText = formattedText;
+  } else if (!pastePayloadActive) {
+    payload.lastFormattedText = '';
+  }
+  // else: keep the text already stored for THIS listing (e.g. the AI-formatted text from "Kopieer")
+  return payload;
+}
+
+// Write the paste payload for the listing that is in the form right now (Kopieer and Open Vinted)
+async function writePastePayload(formattedText) {
+  clearTimeout(formSaveTimer);
+  formSaveTimer = null;
+  const formData = getFormData();
+  const ok = await safeStorageSet({
+    listingData: formData,
+    analysisData: analysisData,
+    ...buildPastePayload(formData, formattedText)
+  });
+  if (ok) pastePayloadActive = true;
+  return ok;
+}
+
+// Text fields: debounced. Photos are NOT rewritten here (see saveImages).
+function saveFormData() {
+  clearTimeout(formSaveTimer);
+  formSaveTimer = setTimeout(flushFormSave, FORM_SAVE_DELAY);
+}
+
+async function flushFormSave() {
+  clearTimeout(formSaveTimer);
+  formSaveTimer = null;
+  const formData = getFormData();
+  const items = { listingData: formData, analysisData: analysisData };
+  // Keep an existing paste payload in sync with edits, so "Plakken" always uses the current text
+  if (pastePayloadActive) {
+    Object.assign(items, buildPastePayload(formData, currentPasteText(formData)));
+  }
+  return safeStorageSet(items);
+}
+
+// Photos: written only when they change (add, remove, reorder)
+function saveImages() {
+  return safeStorageSet({ savedImages: uploadedImages.slice(0, MAX_IMAGES) });
+}
+
+// Open Vinted on the country site the user last visited, with an up-to-date paste payload
+async function handleOpenVinted() {
+  await writePastePayload(currentPasteText(getFormData()));
+  const { lastVintedOrigin } = await chrome.storage.local.get(['lastVintedOrigin']);
+  const origin = AP_CONFIG.VINTED_ORIGINS.includes(lastVintedOrigin) ? lastVintedOrigin : AP_CONFIG.DEFAULT_VINTED_ORIGIN;
+  chrome.tabs.create({ url: `${origin}/items/new` });
+}
+
 function loadSavedData() {
-  chrome.storage.local.get(['listingData', 'savedImages', 'analysisData'], (result) => {
+  chrome.storage.local.get(['listingData', 'savedImages', 'analysisData', 'lastListingId', 'lastTitle', 'lastFormattedText'], (result) => {
     if (result.listingData) {
       const data = result.listingData;
       document.getElementById('title').value = data.title || '';
@@ -2100,50 +2236,60 @@ function loadSavedData() {
       }
     }
     
+    // The paste payload must belong to this listing. Anything else (older version, other listing) is stale.
+    currentListingId = result.listingData?.listingId || newListingId();
+    if (result.lastListingId && result.lastListingId === currentListingId) {
+      pastePayloadActive = true;
+    } else if (result.lastListingId || result.lastTitle || result.lastFormattedText) {
+      clearPastePayload();
+    }
+    
     // Load saved images
     if (result.savedImages && result.savedImages.length > 0) {
       uploadedImages = result.savedImages;
       renderImagePreviews();
+      shrinkLegacyImages();
     }
   });
 }
 
 function clearForm() {
   const t = window.i18n.t;
+  clearTimeout(formSaveTimer);
+  formSaveTimer = null;
   document.getElementById('listingForm').reset();
   uploadedImages = [];
-  analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '' };
+  analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '', quantity: 1 };
   imagePreviews.innerHTML = '';
+  formWasCleared = false;
   
-  // Clear category picker
+  // Clear category picker (it schedules a save; cancel that, we remove everything below)
   clearCategorySelection();
+  clearTimeout(formSaveTimer);
+  formSaveTimer = null;
   
-  chrome.storage.local.remove(['listingData', 'savedImages', 'analysisData']);
+  // New, empty listing: also forget what "Plakken" would paste on Vinted
+  currentListingId = newListingId();
+  pastePayloadActive = false;
+  chrome.storage.local.remove(['listingData', 'savedImages', 'analysisData', ...PASTE_PAYLOAD_KEYS]).catch((error) => {
+    console.error('Clearing storage failed:', error);
+  });
   updateAnalyzeButton();
   showToast(t('formCleared'), 'info');
 }
 
 // Toast notification
-function showToast(message, type = 'info') {
-  toast.textContent = message;
-  toast.className = `toast ${type} show`;
+let toastTimer = null;
+function showToast(message, type = 'info', duration = 3000) {
+  const el = toast || document.getElementById('toast');
+  if (!el) return;
+  el.textContent = message;
+  el.className = `toast ${type} show`;
   
-  setTimeout(() => {
-    toast.classList.remove('show');
-  }, 3000);
-}
-
-// Utility
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el.classList.remove('show');
+  }, duration);
 }
 
 // ============================================
@@ -2442,7 +2588,7 @@ function selectCategory(key, displayLabel) {
   closeCategoryDropdown();
   saveFormData();
   
-  showToast(`Categorie: ${label}`, 'success');
+  showToast(`${window.i18n.t('category')}: ${label}`, 'success');
 }
 
 // Clear category selection

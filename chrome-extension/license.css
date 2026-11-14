@@ -128,10 +128,11 @@ body[data-theme="light"] .logo img {
   border: 2px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   text-align: center;
-  letter-spacing: 2px;
+  letter-spacing: 0.5px;
   text-transform: uppercase;
   transition: all 0.2s ease;
 }
@@ -161,6 +162,13 @@ body[data-theme="light"] .logo img {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-8px); }
   75% { transform: translateX(8px); }
+}
+
+.key-hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 8px;
+  line-height: 1.4;
 }
 
 .error-message {

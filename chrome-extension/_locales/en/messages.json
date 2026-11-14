@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Autoposter for Vinted",
+    "description": "Extension name shown in Chrome and the Chrome Web Store."
+  },
+  "extDescription": {
+    "message": "AI reads your photos and fills in the title, description and category on Vinted. You set the price.",
+    "description": "Short description (max 132 characters)."
+  }
+}

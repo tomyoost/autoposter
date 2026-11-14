@@ -1,0 +1,79 @@
+// Aanroep van Google Gemini via het OpenAI-compatibele adres, met instelbaar model en een reservemodel.
+import { getSetting } from "./db.ts";
+
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+
+export type GeminiPurpose = "analyze" | "text";
+
+export type GeminiResult =
+  | { ok: true; data: any; model: string }
+  | { ok: false; status: number; code: "NO_API_KEY" | "AI_RATE_LIMIT" | "AI_NO_CREDITS" | "AI_ERROR"; detail: string };
+
+/** Kiest het model uit app_settings: ai_model_analyze / ai_model_text, met ai_model_fallback als reserve. */
+async function modelsFor(purpose: GeminiPurpose): Promise<string[]> {
+  const primary = await getSetting<string>(purpose === "analyze" ? "ai_model_analyze" : "ai_model_text", "gemini-3.5-flash-lite");
+  const fallback = await getSetting<string>("ai_model_fallback", "gemini-3.1-flash-lite");
+  return [...new Set([primary, fallback].filter((m) => typeof m === "string" && m.length > 0))];
+}
+
+/**
+ * Doet één logische AI-aanroep. Bestaat het model niet (meer), dan wordt het reservemodel gebruikt.
+ * Wordt de denkinstelling niet ondersteund, dan wordt het zonder geprobeerd.
+ */
+export async function callGemini(
+  purpose: GeminiPurpose,
+  payload: Record<string, unknown>,
+  opts: { deadline?: number } = {},
+): Promise<GeminiResult> {
+  const deadline = opts.deadline ?? Date.now() + 40_000;
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!apiKey) return { ok: false, status: 500, code: "NO_API_KEY", detail: "GEMINI_API_KEY not configured" };
+
+  const effort = await getSetting<string | null>("ai_reasoning_effort", "medium");
+  let lastError: GeminiResult = { ok: false, status: 500, code: "AI_ERROR", detail: "no model tried" };
+
+  for (const model of await modelsFor(purpose)) {
+    let withEffort = typeof effort === "string" && effort.length > 0;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const remaining = deadline - Date.now();
+      if (remaining < 3_000) {
+        return { ok: false, status: 504, code: "AI_ERROR", detail: "time budget used up" };
+      }
+      const body: Record<string, unknown> = { ...payload, model };
+      if (withEffort) body.reasoning_effort = effort;
+
+      const started = Date.now();
+      let res: Response;
+      try {
+        res = await fetch(GEMINI_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(Math.min(25_000, remaining - 500)),
+        });
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : String(e);
+        console.error(`Gemini ${model} geen antwoord na ${Date.now() - started} ms: ${detail.slice(0, 120)}`);
+        lastError = { ok: false, status: 504, code: "AI_ERROR", detail };
+        break; // probeer het reservemodel
+      }
+
+      if (res.ok) {
+        console.log(`Gemini ${model} ok in ${Date.now() - started} ms`);
+        return { ok: true, data: await res.json(), model };
+      }
+
+      const text = (await res.text()).slice(0, 500);
+      if (res.status === 429) return { ok: false, status: 429, code: "AI_RATE_LIMIT", detail: text };
+      if (res.status === 402) return { ok: false, status: 402, code: "AI_NO_CREDITS", detail: text };
+      if (res.status === 400 && withEffort && /reasoning|thinking/i.test(text)) {
+        withEffort = false; // dit model kent de denkinstelling niet: opnieuw zonder
+        continue;
+      }
+      console.error(`Gemini ${model} gaf ${res.status}: ${text.slice(0, 200)}`);
+      lastError = { ok: false, status: 500, code: "AI_ERROR", detail: `${model}: ${res.status}` };
+      break; // model bestaat niet, is uitgefaseerd of gaf een serverfout: probeer het reservemodel
+    }
+  }
+  return lastError;
+}

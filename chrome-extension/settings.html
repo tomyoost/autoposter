@@ -43,14 +43,6 @@
         Create custom templates for each platform. Use placeholders like {{title}}, {{price}}, etc.
       </p>
       
-      <div class="template-tabs">
-        <button class="tab-btn active" data-platform="vinted">Vinted</button>
-        <button class="tab-btn" data-platform="marktplaats">Marktplaats</button>
-        <button class="tab-btn" data-platform="facebook">Facebook</button>
-        <button class="tab-btn" data-platform="etsy">Etsy</button>
-        <button class="tab-btn" data-platform="ebay">eBay</button>
-      </div>
-
       <div class="template-editor">
         <div class="placeholder-help">
           <p class="help-title" data-i18n="availablePlaceholders">Available placeholders:</p>
@@ -110,7 +102,7 @@ Price: €{{price}}
           <span class="plan-badge" id="currentPlanBadge">Free</span>
         </div>
         <p class="subscription-help" data-i18n="subscriptionHelp">Manage your subscription on Gumroad to upgrade, downgrade, or cancel.</p>
-        <a href="https://app.gumroad.com/library" target="_blank" class="btn btn-outline subscription-link" id="manageSubscriptionBtn">
+        <a target="_blank" rel="noopener" class="btn btn-outline subscription-link" id="manageSubscriptionBtn">
           <span data-i18n="manageSubscription">Manage Subscription</span>
           <span class="external-icon">↗</span>
         </a>
@@ -171,6 +163,7 @@ Price: €{{price}}
     <div id="toast" class="toast"></div>
   </div>
 
+  <script src="config.js"></script>
   <script src="i18n.js"></script>
   <script src="settings.js"></script>
 </body>

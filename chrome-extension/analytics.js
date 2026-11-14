@@ -1,5 +1,4 @@
-// Autoposter Analytics - Lightweight event tracking
-const TRACK_URL = 'https://JOUW_PROJECT_ID.supabase.co/functions/v1/track-event';
+// Autoposter Analytics - Lightweight event tracking (needs config.js loaded first)
 
 // Queue events and send in background (fire-and-forget, never blocks UI)
 function trackEvent(eventName, extra = {}) {
@@ -17,7 +16,7 @@ function trackEvent(eventName, extra = {}) {
     };
 
     // Fire and forget - never await, never block
-    fetch(TRACK_URL, {
+    fetch(AP_CONFIG.TRACK_EVENT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

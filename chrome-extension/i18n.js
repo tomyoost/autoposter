@@ -3,13 +3,13 @@
 const translations = {
   nl: {
     // Header
-    tagline: 'Slimme Listing Prep Tool',
+    tagline: 'Sneller verkopen op Vinted',
     
     // Intro
     introText: 'Upload je foto\'s eerst. Autoposter analyseert automatisch je product en vult alle velden voor je in.',
     
     // Sections
-    productInfo: 'Product Info',
+    productInfo: 'Productgegevens',
     description: 'Beschrijving',
     photos: 'Foto\'s',
     copyPost: 'Kopieer & Post',
@@ -61,25 +61,25 @@ const translations = {
     upgrade: 'Upgrade',
     unlimited: 'onbeperkt',
     usageLimitReached: 'Limiet bereikt! Upgrade voor meer AI analyses.',
-    welcomeTitle: 'Welkom bij AutoPoster!',
+    welcomeTitle: 'Welkom bij Autoposter!',
     welcomeText: 'Leer in 3 stappen hoe je in seconden listings maakt.',
     step1Title: 'Upload Foto\'s',
     step1Desc: 'Sleep of klik om productfoto\'s toe te voegen',
     step2Title: 'AI Analyseert',
     step2Desc: 'Onze AI vult automatisch alle velden in',
-    step3Title: 'Kopieer & Plak',
-    step3Desc: 'Klik op Vinted en plak op de marktplaats',
+    step3Title: 'Plakken op Vinted',
+    step3Desc: 'Open Vinted en klik rechtsonder op \'Plakken\'',
     getStarted: 'Aan de slag!',
     skipTutorial: 'Overslaan',
     
     // Upload
     uploadText: 'Klik of sleep foto\'s hier',
-    uploadLimit: 'Max 10 foto\'s (5MB per foto)',
+    uploadLimit: 'Max 10 foto\'s (tot 15 MB per foto)',
     aiHintNoPhoto: 'Upload een foto om AI analyse te activeren',
     aiHintReady: 'Klik om de eerste foto te analyseren en het formulier automatisch in te vullen',
     
     // Platform section
-    platformDescription: 'Klik op een platform om de listing te formatteren en kopiëren. Open daarna de marketplace om te plakken.',
+    platformDescription: 'Open Vinted vanuit hier en klik daar rechtsonder op \'Plakken\'. Foto\'s, titel, beschrijving, prijs en categorie worden dan ingevuld.',
     
     // Toasts
     copied: 'Gekopieerd',
@@ -92,13 +92,23 @@ const translations = {
     onlyImages: 'Alleen afbeeldingen toegestaan',
     fileTooLarge: 'is te groot',
     maxPhotos: 'foto\'s toegestaan',
-    comingSoon: 'Binnenkort',
     formCleared: 'Formulier gewist',
     noTemplate: 'Geen template ingesteld. Ga naar instellingen.',
     imageDownloaded: 'Afbeelding gedownload',
     base64Copied: 'Base64 gekopieerd naar klembord',
     autoAnalyzing: 'Foto gedetecteerd, analyse wordt gestart...',
-    
+    templateApplied: 'Sjabloon toegepast',
+    imageReadFailed: 'kon niet worden gelezen',
+    copyFailed: 'Kopiëren mislukt',
+    storageFull: 'Opslaan lukt niet: de opslag van de extensie is vol. Verwijder een paar foto\'s of wis het formulier.',
+    generationLimit: 'Je maandlimiet voor AI-teksten is bereikt. Upgrade voor meer, of schrijf de beschrijving zelf.',
+    generateFailed: 'Het maken van de tekst is mislukt. Probeer het opnieuw.',
+    licenseProblem: 'Je sleutel is niet (meer) geldig. We controleren hem opnieuw.',
+    serviceUnavailable: 'De server is even niet bereikbaar. Probeer het over een paar minuten opnieuw.',
+    aiBusy: 'De AI is even druk. Probeer het over een minuut opnieuw.',
+    aiFailed: 'De AI kon de foto niet analyseren. Probeer het opnieuw of kies een andere foto.',
+    aiRetrying: 'AI-fout, we proberen het nog één keer...',
+    imageRejected: 'Deze foto kan niet worden geanalyseerd. Probeer een andere foto (JPG of PNG).',    
     // Loading states
     analyzing: 'Analyseren...',
     generating: 'Genereren...',
@@ -108,7 +118,7 @@ const translations = {
     paste: 'Plakken',
     filling: 'Invullen...',
     filled: 'Ingevuld',
-    noData: 'Geen data beschikbaar. Kopieer eerst vanuit AutoPoster.',
+    noData: 'Geen data beschikbaar. Kopieer eerst vanuit Autoposter.',
     fieldsNotFound: 'Velden niet gevonden. Tekst gekopieerd - plak met Ctrl+V',
     couldNotFill: 'Kon niet invullen. Probeer handmatig.',
     platformNotRecognized: 'Platform niet herkend',
@@ -138,15 +148,25 @@ const translations = {
     catSports: 'Sport',
     
     // License page
-    licenseTitle: 'Activeer AutoPoster',
-    licenseSubtitle: 'Voer je license key in om de extensie te activeren.',
+    licenseTitle: 'Activeer Autoposter',
+    licenseSubtitle: 'Vul je licentiesleutel in om Autoposter te activeren.',
     licenseActivate: 'Activeren',
-    licenseFooter: 'Geen license key?',
-    licenseBuyOn: 'Koop er een op Gumroad',
-    licenseTryFree: 'Of probeer gratis met code:',
+    licenseKeyHint: 'Je sleutel staat op je Gumroad-bon, in de bevestigingsmail en in je Gumroad-bibliotheek.',
+    licenseNoKey: 'Nog geen sleutel?',
+    licenseStartFree: 'Start gratis (3 AI-analyses per maand)',
+    licenseBuy: 'Starter of Pro kopen',
+    licenseLostKey: 'Sleutel kwijt?',
+    licenseInLibrary: 'Staat in je Gumroad-bibliotheek',
     licenseActivating: 'Activeren...',
     licenseSuccess: 'Geactiveerd!',
-    licenseInvalid: 'Ongeldige license key',
+    licenseInvalid: 'Deze sleutel werkt niet. Controleer of je hem goed hebt overgenomen.',
+    licenseErrInvalid: 'Deze sleutel kennen we niet. Controleer of je hem helemaal goed hebt overgenomen.',
+    licenseErrInactive: 'Deze sleutel is niet meer actief, bijvoorbeeld omdat het abonnement is gestopt of terugbetaald.',
+    licenseErrExpired: 'Deze sleutel is verlopen.',
+    licenseErrFormat: 'Dit lijkt geen geldige sleutel. Een Gumroad-sleutel ziet er zo uit: XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX.',
+    licenseErrEmpty: 'Vul eerst je sleutel in.',
+    licenseErrUnavailable: 'We kunnen je sleutel nu even niet controleren. Probeer het over een paar minuten opnieuw.',
+    licenseNetworkError: 'Geen verbinding met de server. Controleer je internet en probeer het opnieuw.',
     
     // Upgrade page
     upgradeTitle: 'Kies je plan',
@@ -168,23 +188,22 @@ const translations = {
     tierProDesc: 'Voor power resellers',
     
     // Features
-    featureAnalyses: 'AI analyses per maand',
-    featureUnlimitedAI: 'Onbeperkt AI analyses',
-    featureEmailSupport: 'Email support',
-    featureEarlyAccess: 'Vroegtijdige toegang tot nieuwe features',
-    featureSupport24h: 'Email support (24u)',
-    featureSupport48h: 'Email support (48u)',
+    featureAnalyses: 'AI-analyses per maand',
+    featureUnlimitedAI: 'Onbeperkt AI-analyses',
+    featureTexts: 'AI-teksten per maand',
+    featureUnlimitedTexts: 'Onbeperkt AI-teksten',
+    upgradeBuyHint: 'Beide knoppen gaan naar dezelfde Gumroad-pagina. Daar kies je Starter of Pro.',
     
     // FAQ
     faqTitle: 'Veelgestelde vragen',
     faqKeyQuestion: 'Hoe krijg ik mijn license key?',
-    faqKeyAnswer: 'Na aankoop ontvang je je license key per email. Voer deze in op de activatiepagina.',
+    faqKeyAnswer: 'Na het kopen staat je sleutel op je Gumroad-bon, in de bevestigingsmail en in je Gumroad-bibliotheek. Vul hem hieronder in.',
     faqUpgradeQuestion: 'Kan ik op elk moment upgraden?',
-    faqUpgradeAnswer: 'Ja! Je kunt op elk moment upgraden en je nieuwe limiet gaat direct in.',
+    faqUpgradeAnswer: 'Ja. Wissel van abonnement via je Gumroad-bibliotheek en klik daarna hier op \'Plan vernieuwen\'. Je nieuwe limiet geldt meteen.',
     faqLimitQuestion: 'Wat als ik mijn limiet bereik?',
     faqLimitAnswer: 'Je ziet een upgrade melding. Je kunt alle velden nog handmatig invullen, maar krijgt geen AI hulp meer deze maand.',
     faqCancelQuestion: 'Kan ik mijn abonnement opzeggen?',
-    faqCancelAnswer: 'Ja, je kunt op elk moment opzeggen. Je houdt toegang tot het einde van je betaalperiode.',
+    faqCancelAnswer: 'Ja, je kunt op elk moment opzeggen via je Gumroad-bibliotheek. Je houdt toegang tot het einde van je betaalperiode.',
     
     // Analysis
     analysisTimeout: 'Analyse timeout, probeer opnieuw',
@@ -205,23 +224,26 @@ const translations = {
     betaFeedback: 'Beta - Geef Feedback!',
     
     // Footer
-    footerQuestions: 'Vragen?',
-    footerContact: 'Neem contact op via Discord',
+    footerQuestions: 'Vragen of feedback?',
+    footerContact: 'Laat het ons weten via het feedbackformulier',
     back: 'Terug',
     
     // License settings
-    licenseSettings: 'License Key Activeren',
+    licenseSettings: 'Licentiesleutel activeren',
     currentLicense: 'Huidig plan:',
-    changeLicense: 'Wijzig License',
+    changeLicense: 'Sleutel wijzigen',
     activateLicense: 'Activeren',
-    licenseHelp: 'Heb je een license key gekocht? Voer deze hieronder in om je plan te activeren.',
-    licenseChanged: 'License geactiveerd!',
-    licenseChangeFailed: 'Ongeldige license key',
+    licenseHelp: 'Heb je een sleutel gekocht of een nieuwe gekregen? Vul hem hieronder in.',
+    licenseChanged: 'Sleutel geactiveerd!',
+    licenseChangeFailed: 'Deze sleutel werkt niet',
+    refreshPlan: 'Plan vernieuwen',
+    refreshPlanHelp: 'Al geüpgraded op Gumroad? Klik op \'Plan vernieuwen\' om je nieuwe limiet op te halen.',
+    planRefreshed: 'Je plan is bijgewerkt',
     
     // Subscription management
     subscription: 'Abonnement',
-    subscriptionHelp: 'Beheer je abonnement op Gumroad om te upgraden, downgraden of opzeggen.',
-    manageSubscription: 'Beheer Abonnement',
+    subscriptionHelp: 'Upgraden, downgraden of opzeggen doe je in je Gumroad-bibliotheek.',
+    manageSubscription: 'Abonnement beheren',
     
     // Offline
     noInternet: 'Geen internetverbinding. Controleer je verbinding en probeer opnieuw.'
@@ -229,13 +251,13 @@ const translations = {
   
   en: {
     // Header
-    tagline: 'Smart Listing Prep Tool',
+    tagline: 'Sell faster on Vinted',
     
     // Intro
     introText: 'Upload your photos first. Autoposter automatically analyzes your product and fills in all fields for you.',
     
     // Sections
-    productInfo: 'Product Info',
+    productInfo: 'Product details',
     description: 'Description',
     photos: 'Photos',
     copyPost: 'Copy & Post',
@@ -287,25 +309,25 @@ const translations = {
     upgrade: 'Upgrade',
     unlimited: 'unlimited',
     usageLimitReached: 'Limit reached! Upgrade for more AI analyses.',
-    welcomeTitle: 'Welcome to AutoPoster!',
+    welcomeTitle: 'Welcome to Autoposter!',
     welcomeText: 'Learn in 3 steps how to create listings in seconds.',
     step1Title: 'Upload Photos',
     step1Desc: 'Drag or click to add product photos',
     step2Title: 'AI Analyzes',
     step2Desc: 'Our AI automatically fills all fields',
-    step3Title: 'Copy & Paste',
-    step3Desc: 'Click Vinted and paste on the marketplace',
+    step3Title: 'Paste on Vinted',
+    step3Desc: 'Open Vinted and click \'Paste\' at the bottom right',
     getStarted: 'Get Started!',
     skipTutorial: 'Skip',
     
     // Upload
     uploadText: 'Click or drag photos here',
-    uploadLimit: 'Max 10 photos (5MB per photo)',
+    uploadLimit: 'Max 10 photos (up to 15 MB each)',
     aiHintNoPhoto: 'Upload a photo to enable AI analysis',
     aiHintReady: 'Click to analyze the first photo and auto-fill the form',
     
     // Platform section
-    platformDescription: 'Click a platform to format and copy the listing. Then open the marketplace to paste.',
+    platformDescription: 'Open Vinted from here and click \'Paste\' at the bottom right. Photos, title, description, price and category are filled in for you.',
     
     // Toasts
     copied: 'Copied',
@@ -318,13 +340,23 @@ const translations = {
     onlyImages: 'Only images allowed',
     fileTooLarge: 'is too large',
     maxPhotos: 'photos allowed',
-    comingSoon: 'Coming Soon',
     formCleared: 'Form cleared',
     noTemplate: 'No template set. Go to settings.',
     imageDownloaded: 'Image downloaded',
     base64Copied: 'Base64 copied to clipboard',
     autoAnalyzing: 'Photo detected, starting analysis...',
-    
+    templateApplied: 'Template applied',
+    imageReadFailed: 'could not be read',
+    copyFailed: 'Copy failed',
+    storageFull: 'Could not save: the extension storage is full. Remove some photos or clear the form.',
+    generationLimit: 'You have reached your monthly limit for AI texts. Upgrade for more, or write the description yourself.',
+    generateFailed: 'Could not create the text. Please try again.',
+    licenseProblem: 'Your key is not valid (anymore). We are checking it again.',
+    serviceUnavailable: 'The server is unavailable right now. Please try again in a few minutes.',
+    aiBusy: 'The AI is busy right now. Please try again in a minute.',
+    aiFailed: 'The AI could not analyze the photo. Try again or choose another photo.',
+    aiRetrying: 'AI error, trying once more...',
+    imageRejected: 'This photo cannot be analyzed. Try another photo (JPG or PNG).',    
     // Loading states
     analyzing: 'Analyzing...',
     generating: 'Generating...',
@@ -334,7 +366,7 @@ const translations = {
     paste: 'Paste',
     filling: 'Filling...',
     filled: 'Filled',
-    noData: 'No data available. Copy from AutoPoster first.',
+    noData: 'No data available. Copy from Autoposter first.',
     fieldsNotFound: 'Fields not found. Text copied - paste with Ctrl+V',
     couldNotFill: 'Could not fill. Try manually.',
     platformNotRecognized: 'Platform not recognized',
@@ -364,15 +396,25 @@ const translations = {
     catSports: 'Sports',
     
     // License page
-    licenseTitle: 'Activate AutoPoster',
-    licenseSubtitle: 'Enter your license key to activate the extension.',
+    licenseTitle: 'Activate Autoposter',
+    licenseSubtitle: 'Enter your license key to activate Autoposter.',
     licenseActivate: 'Activate',
-    licenseFooter: 'No license key?',
-    licenseBuyOn: 'Buy one on Gumroad',
-    licenseTryFree: 'Or try free with code:',
+    licenseKeyHint: 'Your key is on your Gumroad receipt, in the confirmation email and in your Gumroad library.',
+    licenseNoKey: 'No key yet?',
+    licenseStartFree: 'Start for free (3 AI analyses per month)',
+    licenseBuy: 'Buy Starter or Pro',
+    licenseLostKey: 'Lost your key?',
+    licenseInLibrary: 'It is in your Gumroad library',
     licenseActivating: 'Activating...',
     licenseSuccess: 'Activated!',
-    licenseInvalid: 'Invalid license key',
+    licenseInvalid: 'This key does not work. Check that you copied it correctly.',
+    licenseErrInvalid: 'We do not know this key. Check that you copied all of it correctly.',
+    licenseErrInactive: 'This key is no longer active, for example because the subscription ended or was refunded.',
+    licenseErrExpired: 'This key has expired.',
+    licenseErrFormat: 'This does not look like a valid key. A Gumroad key looks like this: XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX.',
+    licenseErrEmpty: 'Please enter your key first.',
+    licenseErrUnavailable: 'We cannot check your key right now. Please try again in a few minutes.',
+    licenseNetworkError: 'No connection to the server. Check your internet connection and try again.',
     
     // Upgrade page
     upgradeTitle: 'Choose your plan',
@@ -396,21 +438,20 @@ const translations = {
     // Features
     featureAnalyses: 'AI analyses per month',
     featureUnlimitedAI: 'Unlimited AI analyses',
-    featureEmailSupport: 'Email support',
-    featureEarlyAccess: 'Early access to new features',
-    featureSupport24h: 'Email support (24h)',
-    featureSupport48h: 'Email support (48h)',
+    featureTexts: 'AI texts per month',
+    featureUnlimitedTexts: 'Unlimited AI texts',
+    upgradeBuyHint: 'Both buttons go to the same Gumroad page. You choose Starter or Pro there.',
     
     // FAQ
     faqTitle: 'Frequently asked questions',
     faqKeyQuestion: 'How do I get my license key?',
-    faqKeyAnswer: 'After purchase you will receive your license key by email. Enter it on the activation page.',
+    faqKeyAnswer: 'After buying, your key is on your Gumroad receipt, in the confirmation email and in your Gumroad library. Enter it below.',
     faqUpgradeQuestion: 'Can I upgrade at any time?',
-    faqUpgradeAnswer: 'Yes! You can upgrade at any time and your new limit takes effect immediately.',
+    faqUpgradeAnswer: 'Yes. Change your subscription in your Gumroad library, then click \'Refresh plan\' here. Your new limit applies right away.',
     faqLimitQuestion: 'What if I reach my limit?',
     faqLimitAnswer: 'You will see an upgrade prompt. You can still fill in all fields manually, but won\'t get AI help for the rest of the month.',
     faqCancelQuestion: 'Can I cancel my subscription?',
-    faqCancelAnswer: 'Yes, you can cancel at any time. You keep access until the end of your billing period.',
+    faqCancelAnswer: 'Yes, you can cancel at any time in your Gumroad library. You keep access until the end of your billing period.',
     
     // Analysis
     analysisTimeout: 'Analysis timeout, please try again',
@@ -431,23 +472,26 @@ const translations = {
     betaFeedback: 'Beta - Give Feedback!',
     
     // Footer
-    footerQuestions: 'Questions?',
-    footerContact: 'Contact us on Discord',
+    footerQuestions: 'Questions or feedback?',
+    footerContact: 'Let us know via the feedback form',
     back: 'Back',
     
     // License settings
-    licenseSettings: 'Activate License Key',
+    licenseSettings: 'Activate license key',
     currentLicense: 'Current plan:',
-    changeLicense: 'Change License',
+    changeLicense: 'Change key',
     activateLicense: 'Activate',
-    licenseHelp: 'Purchased a license key? Enter it below to activate your plan.',
-    licenseChanged: 'License activated!',
-    licenseChangeFailed: 'Invalid license key',
+    licenseHelp: 'Bought a key or got a new one? Enter it below.',
+    licenseChanged: 'Key activated!',
+    licenseChangeFailed: 'This key does not work',
+    refreshPlan: 'Refresh plan',
+    refreshPlanHelp: 'Already upgraded on Gumroad? Click \'Refresh plan\' to load your new limit.',
+    planRefreshed: 'Your plan has been updated',
     
     // Subscription management
     subscription: 'Subscription',
-    subscriptionHelp: 'Manage your subscription on Gumroad to upgrade, downgrade, or cancel.',
-    manageSubscription: 'Manage Subscription',
+    subscriptionHelp: 'Upgrade, downgrade or cancel in your Gumroad library.',
+    manageSubscription: 'Manage subscription',
     
     // Offline
     noInternet: 'No internet connection. Check your connection and try again.'

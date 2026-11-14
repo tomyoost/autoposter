@@ -1,10 +1,13 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-license-key',
-};
+import { json, preflight, readJson } from "../_shared/http.ts";
+import { callGemini } from "../_shared/gemini.ts";
+import {
+  currentMonth,
+  enforcedLimit,
+  licenseErrorStatus,
+  releaseUsage,
+  reserveUsage,
+  resolveLicense,
+} from "../_shared/license.ts";
 
 interface ListingData {
   title: string;
@@ -344,252 +347,197 @@ Output: PS5 Controller Last of Us
 
 ONLY the title, nothing else.`;
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
 
-  try {
-    // === REQUEST SIZE CHECK ===
-    const contentLength = req.headers.get('content-length');
-    if (contentLength && parseInt(contentLength) > 1 * 1024 * 1024) {
-      return new Response(
-        JSON.stringify({ error: 'Request too large', error_code: 'PAYLOAD_TOO_LARGE' }),
-        { status: 413, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+function buildPrompts(action: string, listing: unknown, platform: string | undefined, validatedLanguage: string): { systemPrompt: string; userPrompt: string } {
+  const listingData = listing as ListingData;
+  const isEnglish = validatedLanguage === 'en';
+  
+  let systemPrompt = '';
+  let userPrompt = '';
 
-    const { action, listing, platform, language = 'nl' } = await req.json();
+  if (action === 'generate_description') {
+    systemPrompt = isEnglish ? highConvertingDescriptionEN : highConvertingDescriptionNL;
 
-    // === INPUT VALIDATION ===
-    const VALID_ACTIONS = ['generate_description', 'format_for_platform', 'optimize_title'];
-    if (!action || !VALID_ACTIONS.includes(action)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid action', error_code: 'INVALID_ACTION' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const VALID_PLATFORMS = ['vinted', 'marktplaats', 'facebook', 'etsy', 'ebay'];
-    if (action === 'format_for_platform' && (!platform || !VALID_PLATFORMS.includes(platform))) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid platform', error_code: 'INVALID_PLATFORM' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const VALID_LANGUAGES = ['nl', 'en'];
-    const validatedLanguage = VALID_LANGUAGES.includes(language) ? language : 'nl';
-
-    // Validate listing field sizes
-    if (!listing || typeof listing !== 'object') {
-      return new Response(
-        JSON.stringify({ error: 'Listing data required', error_code: 'MISSING_LISTING' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const FIELD_LIMITS: Record<string, number> = {
-      title: 200, price: 20, category: 200, condition: 50,
-      tags: 500, template: 2000, additionalInfo: 5000, platform: 20
-    };
-
-    for (const [field, maxLen] of Object.entries(FIELD_LIMITS)) {
-      if (listing[field] && typeof listing[field] === 'string' && listing[field].length > maxLen) {
-        return new Response(
-          JSON.stringify({ error: `${field} too long (max ${maxLen} chars)`, error_code: 'FIELD_TOO_LONG' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-    // === END INPUT VALIDATION ===
-
-    // === LICENSE KEY AUTHENTICATION ===
-    const licenseKey = req.headers.get('x-license-key');
-    if (!licenseKey) {
-      return new Response(
-        JSON.stringify({ error: 'License key required', error_code: 'NO_LICENSE' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    const { data: license } = await supabase
-      .from('licenses')
-      .select('id, tier, is_active')
-      .eq('license_key', licenseKey.trim().toUpperCase())
-      .single();
-
-    if (!license || !license.is_active) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid license', error_code: 'INVALID_LICENSE' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    // === END LICENSE KEY AUTHENTICATION ===
-
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    const conditionText = isEnglish ? getConditionEN(listingData.condition) : listingData.condition;
     
-    if (!GEMINI_API_KEY) {
-      console.error("GEMINI_API_KEY is not configured");
-      throw new Error("AI service not configured");
-    }
-
-    const listingData = listing as ListingData;
-    const isEnglish = validatedLanguage === 'en';
+    // Build a cleaner prompt with only available data
+    const dataPoints: string[] = [];
+    if (listingData.title) dataPoints.push(`Product: ${listingData.title}`);
+    if (listingData.category) dataPoints.push(`Categorie: ${listingData.category}`);
+    if (conditionText) dataPoints.push(`Conditie: ${conditionText}`);
+    if (listingData.quantity && listingData.quantity > 1) dataPoints.push(`Quantity: ${listingData.quantity} (use PLURAL forms!)`);
+    if (listingData.tags) dataPoints.push(`Tags: ${listingData.tags}`);
+    if (listingData.additionalInfo) dataPoints.push(`Extra info: ${listingData.additionalInfo}`);
+    if (listingData.template) dataPoints.push(`Notities: ${listingData.template}`);
     
-    let systemPrompt = '';
-    let userPrompt = '';
-
-    if (action === 'generate_description') {
-      systemPrompt = isEnglish ? highConvertingDescriptionEN : highConvertingDescriptionNL;
-
-      const conditionText = isEnglish ? getConditionEN(listingData.condition) : listingData.condition;
-      
-      // Build a cleaner prompt with only available data
-      const dataPoints: string[] = [];
-      if (listingData.title) dataPoints.push(`Product: ${listingData.title}`);
-      if (listingData.category) dataPoints.push(`Categorie: ${listingData.category}`);
-      if (conditionText) dataPoints.push(`Conditie: ${conditionText}`);
-      if (listingData.quantity && listingData.quantity > 1) dataPoints.push(`Quantity: ${listingData.quantity} (use PLURAL forms!)`);
-      if (listingData.tags) dataPoints.push(`Tags: ${listingData.tags}`);
-      if (listingData.additionalInfo) dataPoints.push(`Extra info: ${listingData.additionalInfo}`);
-      if (listingData.template) dataPoints.push(`Notities: ${listingData.template}`);
-      
-      userPrompt = isEnglish
-        ? `Generate SHORT description (max 150 chars, NO markdown, NO em dash):
+    userPrompt = isEnglish
+      ? `Generate SHORT description (max 150 chars, NO markdown, NO em dash):
 
 ${dataPoints.join('\n')}
 
 OUTPUT ONLY THE DESCRIPTION:`
-        : `Genereer KORTE beschrijving (max 150 tekens, GEEN markdown, GEEN em dash):
+      : `Genereer KORTE beschrijving (max 150 tekens, GEEN markdown, GEEN em dash):
 
 ${dataPoints.join('\n')}
 
 OUTPUT ALLEEN DE BESCHRIJVING:`;
 
-    } else if (action === 'format_for_platform' && platform) {
-      const prompts = isEnglish ? platformPromptsEN : platformPromptsNL;
-      systemPrompt = prompts[platform] || prompts.vinted;
+  } else if (action === 'format_for_platform' && platform) {
+    const prompts = isEnglish ? platformPromptsEN : platformPromptsNL;
+    systemPrompt = prompts[platform] || prompts.vinted;
 
-      const conditionText = (platform === 'etsy' || platform === 'ebay' || isEnglish) 
-        ? getConditionEN(listingData.condition) 
-        : listingData.condition;
+    const conditionText = (platform === 'etsy' || platform === 'ebay' || isEnglish) 
+      ? getConditionEN(listingData.condition) 
+      : listingData.condition;
 
-      // Build clean data points
-      const dataPoints: string[] = [];
-      if (listingData.title) dataPoints.push(`Product: ${listingData.title}`);
-      if (listingData.category) dataPoints.push(`Category: ${listingData.category}`);
-      if (conditionText) dataPoints.push(`Condition: ${conditionText}`);
-      if (listingData.quantity && listingData.quantity > 1) dataPoints.push(`Quantity: ${listingData.quantity} (use PLURAL forms! e.g. "boxes" not "box", "controllers" not "controller")`);
-      if (listingData.tags) dataPoints.push(`Tags: ${listingData.tags}`);
-      if (listingData.additionalInfo) dataPoints.push(`Extra info: ${listingData.additionalInfo}`);
-      if (listingData.template) dataPoints.push(`Description notes: ${listingData.template}`);
+    // Build clean data points
+    const dataPoints: string[] = [];
+    if (listingData.title) dataPoints.push(`Product: ${listingData.title}`);
+    if (listingData.category) dataPoints.push(`Category: ${listingData.category}`);
+    if (conditionText) dataPoints.push(`Condition: ${conditionText}`);
+    if (listingData.quantity && listingData.quantity > 1) dataPoints.push(`Quantity: ${listingData.quantity} (use PLURAL forms! e.g. "boxes" not "box", "controllers" not "controller")`);
+    if (listingData.tags) dataPoints.push(`Tags: ${listingData.tags}`);
+    if (listingData.additionalInfo) dataPoints.push(`Extra info: ${listingData.additionalInfo}`);
+    if (listingData.template) dataPoints.push(`Description notes: ${listingData.template}`);
 
-      userPrompt = isEnglish
-        ? `Generate SHORT ${platform.toUpperCase()} listing (NO markdown, NO em dash, use simple punctuation):
+    userPrompt = isEnglish
+      ? `Generate SHORT ${platform.toUpperCase()} listing (NO markdown, NO em dash, use simple punctuation):
 
 ${dataPoints.join('\n')}
 
 OUTPUT ONLY THE FORMATTED LISTING:`
-        : `Genereer KORTE ${platform.toUpperCase()} listing (GEEN markdown, GEEN em dash, gebruik simpele leestekens):
+      : `Genereer KORTE ${platform.toUpperCase()} listing (GEEN markdown, GEEN em dash, gebruik simpele leestekens):
 
 ${dataPoints.join('\n')}
 
 OUTPUT ALLEEN DE GEFORMATTEERDE LISTING:`;
-    } else if (action === 'optimize_title') {
-      systemPrompt = isEnglish ? titlePromptEN : titlePromptNL;
-      
-      userPrompt = isEnglish
-        ? `Optimize this title (MAX 50 chars, only essential words):
+  } else if (action === 'optimize_title') {
+    systemPrompt = isEnglish ? titlePromptEN : titlePromptNL;
+    
+    userPrompt = isEnglish
+      ? `Optimize this title (MAX 50 chars, only essential words):
 Original: ${listingData.title}
 Category: ${listingData.category || 'unknown'}
 
 OUTPUT ONLY THE OPTIMIZED TITLE:`
-        : `Optimaliseer deze titel (MAX 50 tekens, alleen essentiële woorden):
+      : `Optimaliseer deze titel (MAX 50 tekens, alleen essentiële woorden):
 Origineel: ${listingData.title}
 Categorie: ${listingData.category || 'onbekend'}
 
 OUTPUT ALLEEN DE GEOPTIMALISEERDE TITEL:`;
-    } else {
-      throw new Error("Invalid action or missing platform");
+  } else {
+    throw new Error("Invalid action or missing platform");
+  }
+  return { systemPrompt, userPrompt };
+}
+
+const VALID_ACTIONS = ["generate_description", "format_for_platform", "optimize_title"];
+const VALID_PLATFORMS = ["vinted", "marktplaats", "facebook", "etsy", "ebay"];
+const VALID_LANGUAGES = ["nl", "en"];
+const FIELD_LIMITS: Record<string, number> = {
+  title: 200, price: 20, category: 200, condition: 50,
+  tags: 500, template: 2000, additionalInfo: 5000, platform: 20,
+};
+
+function cleanText(text: string): string {
+  return text
+    .replace(/\*\*/g, "")
+    .replace(/__/g, "")
+    .replace(/[—–]/g, "-") // em/en dash -> streepje
+    .replace(/[“”]/g, '"') // gekrulde dubbele aanhalingstekens
+    .replace(/[‘’]/g, "'") // gekrulde enkele aanhalingstekens
+    .trim();
+}
+
+Deno.serve(async (req) => {
+  const early = preflight(req);
+  if (early) return early;
+
+  let reserved: { licenseId: string; month: string } | null = null;
+
+  try {
+    const parsed = await readJson(req, 1024 * 1024);
+    if (!parsed.ok) return parsed.response;
+    const { action, listing, platform, language } = parsed.body;
+
+    if (!action || !VALID_ACTIONS.includes(action)) {
+      return json({ error: "Invalid action", error_code: "INVALID_ACTION" }, 400);
+    }
+    if (action === "format_for_platform" && (!platform || !VALID_PLATFORMS.includes(platform))) {
+      return json({ error: "Invalid platform", error_code: "INVALID_PLATFORM" }, 400);
+    }
+    const validatedLanguage = VALID_LANGUAGES.includes(language) ? language : "nl";
+    const isEnglish = validatedLanguage === "en";
+
+    if (!listing || typeof listing !== "object") {
+      return json({ error: "Listing data required", error_code: "MISSING_LISTING" }, 400);
+    }
+    for (const [field, maxLen] of Object.entries(FIELD_LIMITS)) {
+      const value = (listing as Record<string, unknown>)[field];
+      if (value === undefined || value === null) continue;
+      if (typeof value !== "string" && typeof value !== "number") {
+        return json({ error: `${field} must be text`, error_code: "INVALID_FIELD" }, 400);
+      }
+      if (String(value).length > maxLen) {
+        return json({ error: `${field} too long (max ${maxLen} chars)`, error_code: "FIELD_TOO_LONG" }, 400);
+      }
+    }
+    const quantity = (listing as Record<string, unknown>).quantity;
+    if (quantity !== undefined && quantity !== null && (typeof quantity !== "number" || !Number.isFinite(quantity) || quantity < 0 || quantity > 999)) {
+      return json({ error: "quantity must be a number", error_code: "INVALID_FIELD" }, 400);
     }
 
-    console.log(`Processing ${action} request${platform ? ` for ${platform}` : ''} in ${language}`);
+    // Licentie
+    const result = await resolveLicense(req.headers.get("x-license-key"));
+    if (!result.ok) {
+      return json({ error: result.message, error_code: result.code }, licenseErrorStatus(result.code));
+    }
+    const { license } = result;
 
-    const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${GEMINI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-      }),
-    });
+    // Eén tekstgeneratie reserveren
+    const month = currentMonth();
+    const reservation = await reserveUsage(license.id, month, "generation", enforcedLimit("generation", license.tier));
+    if (!reservation) return json({ error: "Server error", error_code: "SERVER_ERROR" }, 500);
+    if (!reservation.success) {
+      return json({
+        error: isEnglish
+          ? "You have used all AI texts for this month."
+          : "Je hebt alle AI-teksten van deze maand gebruikt.",
+        error_code: "GENERATION_LIMIT",
+      }, 429);
+    }
+    reserved = { licenseId: license.id, month };
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        const errorMsg = isEnglish ? "Too many requests. Please try again later." : "Te veel verzoeken. Probeer het later opnieuw.";
-        return new Response(JSON.stringify({ error: errorMsg }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    const { systemPrompt, userPrompt } = buildPrompts(action, listing, platform, validatedLanguage);
+    const ai = await callGemini("text", {
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 2048,
+    }, { deadline: Date.now() + 25_000 });
+
+    const generated = ai.ok ? cleanText(String(ai.data?.choices?.[0]?.message?.content ?? "")) : "";
+    if (!ai.ok || !generated) {
+      await releaseUsage(reserved.licenseId, reserved.month, "generation");
+      reserved = null;
+      if (ai.ok === false && ai.code === "AI_RATE_LIMIT") {
+        return json({
+          error: isEnglish ? "Too many requests. Please try again later." : "Te veel verzoeken. Probeer het later opnieuw.",
+          error_code: "AI_RATE_LIMIT",
+        }, 429);
       }
-      if (response.status === 402) {
-        const errorMsg = isEnglish ? "AI credits depleted. Contact support." : "AI credits op. Neem contact op met support.";
-        return new Response(JSON.stringify({ error: errorMsg }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      
-      throw new Error("AI request failed");
+      return json({
+        error: isEnglish ? "Could not generate text, please try again." : "Tekst maken mislukt, probeer het opnieuw.",
+        error_code: "AI_ERROR",
+      }, 500);
     }
 
-    const data = await response.json();
-    let generatedText = data.choices?.[0]?.message?.content || '';
-    
-    // Post-process to clean up any remaining markdown or em dashes
-    generatedText = generatedText
-      .replace(/\*\*/g, '')  // Remove **
-      .replace(/__/g, '')    // Remove __
-      .replace(/—/g, '-')    // Replace em dash with hyphen
-      .replace(/–/g, '-')    // Replace en dash with hyphen
-      .replace(/"/g, '"')    // Replace fancy quotes
-      .replace(/"/g, '"')
-      .replace(/'/g, "'")
-      .replace(/'/g, "'")
-      .trim();
-
-    console.log(`Successfully generated text (${generatedText.length} chars)`);
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      description: generatedText,
-      platform: platform || 'general'
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-
+    return json({ success: true, description: generated, platform: platform || "general" });
   } catch (error) {
-    console.error("Error in generate-listing function:", error);
-    return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "Something went wrong" 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    console.error("generate-listing fout:", error instanceof Error ? error.message : error);
+    if (reserved) await releaseUsage(reserved.licenseId, reserved.month, "generation");
+    return json({ error: "Something went wrong", error_code: "UNKNOWN_ERROR" }, 500);
   }
 });
 

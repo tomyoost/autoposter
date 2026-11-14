@@ -1,5 +1,9 @@
-// AutoPoster Pro - Content Script for Auto-Paste
-// Enhanced autofill for Vinted and Marktplaats with category navigation
+// Autoposter - Content Script for "Plakken" (auto-paste) on Vinted
+// Fills photos, title, description, price and category on the Vinted sell/edit page.
+// config.js is loaded before this file (manifest content_scripts).
+
+// Verbose console logging + "Copy debug info" button. Follows AP_CONFIG.DEV_MODE (false in store builds).
+const DEBUG_MODE = typeof AP_CONFIG !== 'undefined' && AP_CONFIG.DEV_MODE === true;
 
 const PLATFORM_SELECTORS = {
   vinted: {
@@ -75,120 +79,6 @@ const PLATFORM_SELECTORS = {
       'label[for*="photo"]',
       'label[for*="image"]'
     ]
-  },
-  marktplaats: {
-    titleField: [
-      'input[data-e2e="title"]',
-      'input[name="title"]',
-      '#title',
-      '[data-testid="title"]',
-      'input[placeholder*="titel" i]',
-      'input[placeholder*="Titel"]',
-      '.Title input',
-      'form input[type="text"]:first-of-type'
-    ],
-    descriptionField: [
-      'textarea[data-e2e="description"]',
-      'textarea[name="description"]',
-      '#description',
-      '[data-testid="description"]',
-      'textarea[placeholder*="beschrijf" i]',
-      'textarea[placeholder*="Beschrijf"]',
-      '.Description textarea',
-      'form textarea'
-    ],
-    priceField: [
-      'input[data-e2e="price"]',
-      'input[name="price"]',
-      '#price',
-      '[data-testid="price"]',
-      'input[type="number"]',
-      'input[placeholder*="prijs" i]',
-      'input[inputmode="numeric"]',
-      '.Price input'
-    ],
-    categorySearch: [
-      'input[data-testid="category-search"]',
-      'input[placeholder*="categorie" i]',
-      'input[placeholder*="Zoek" i]',
-      '.category-search input',
-      '[data-e2e="category-search"]',
-      'input[type="search"]'
-    ],
-    categoryResult: [
-      '.category-result',
-      '[data-testid="category-option"]',
-      '[data-e2e="category-suggestion"]',
-      'li[role="option"]',
-      '.suggestion-item'
-    ],
-    nextButton: [
-      'button[data-testid="next"]',
-      'button[data-e2e="next"]',
-      'button:contains("Verder")',
-      'button:contains("Next")',
-      '[type="submit"]'
-    ]
-  },
-  facebook: {
-    titleField: [
-      'input[aria-label*="itle" i]',
-      'input[placeholder*="itle" i]',
-      'input[name="title"]',
-      'label[aria-label*="itle" i] input'
-    ],
-    descriptionField: [
-      'textarea[aria-label*="escription" i]',
-      'textarea[placeholder*="escription" i]',
-      '[aria-label*="escription" i]',
-      'textarea[name="description"]'
-    ],
-    priceField: [
-      'input[aria-label*="rice" i]',
-      'input[aria-label*="rijs" i]',
-      'input[name="price"]',
-      'input[type="text"][inputmode="numeric"]'
-    ]
-  },
-  etsy: {
-    titleField: [
-      '#title-input',
-      'input[name="title"]',
-      '[data-test-id="title"]',
-      'input[placeholder*="title" i]'
-    ],
-    descriptionField: [
-      '#description-text-area-input',
-      'textarea[name="description"]',
-      '[data-test-id="description"]',
-      '.wt-text-area'
-    ],
-    priceField: [
-      '#price-input',
-      'input[name="price"]',
-      '[data-test-id="price"]',
-      'input[inputmode="decimal"]'
-    ]
-  },
-  ebay: {
-    titleField: [
-      '#item-title',
-      'input[name="title"]',
-      '[data-testid="title"]',
-      'input[placeholder*="title" i]'
-    ],
-    descriptionField: [
-      '#item-description',
-      'textarea[name="description"]',
-      '[data-testid="description"]',
-      'iframe[title*="description" i]'
-    ],
-    priceField: [
-      '#price-input',
-      'input[name="price"]',
-      '[data-testid="price"]',
-      'input[aria-label*="price" i]'
-    ]
   }
 };
 
@@ -201,7 +91,7 @@ const translations = {
     filling: 'Invullen...',
     filled: 'Ingevuld',
     filledFields: 'Ingevuld',
-    noData: 'Geen data beschikbaar. Kopieer eerst vanuit AutoPoster.',
+    noData: 'Nog niets om te plakken. Klik in de Autoposter-popup op \'Open\' of \'Kopieer\'.',
     fieldsNotFound: 'Velden niet gevonden. Tekst gekopieerd - plak met Ctrl+V',
     couldNotFill: 'Kon niet invullen. Probeer handmatig.',
     platformNotRecognized: 'Platform niet herkend',
@@ -219,14 +109,19 @@ const translations = {
     searchingCategory: 'Categorie zoeken...',
     uploadingPhotos: 'Foto\'s uploaden...',
     photosUploaded: 'foto\'s geüpload',
-    photoUploadFailed: 'Foto upload mislukt, upload handmatig'
+    photoUploadFailed: 'Foto upload mislukt, upload handmatig',
+    stepPhotos: 'Stap 1/3: Foto\'s uploaden...',
+    stepCategory: 'Stap 2/3: Categorie selecteren...',
+    stepFields: 'Stap 3/3: Velden invullen...',
+    manualFields: 'Zelf invullen',
+    failed: 'mislukt'
   },
   en: {
     paste: 'Paste',
     filling: 'Filling...',
     filled: 'Filled',
     filledFields: 'Filled',
-    noData: 'No data available. Copy from AutoPoster first.',
+    noData: 'Nothing to paste yet. Click \'Open\' or \'Copy\' in the Autoposter popup.',
     fieldsNotFound: 'Fields not found. Text copied - paste with Ctrl+V',
     couldNotFill: 'Could not fill. Try manually.',
     platformNotRecognized: 'Platform not recognized',
@@ -244,7 +139,12 @@ const translations = {
     searchingCategory: 'Searching category...',
     uploadingPhotos: 'Uploading photos...',
     photosUploaded: 'photos uploaded',
-    photoUploadFailed: 'Photo upload failed, upload manually'
+    photoUploadFailed: 'Photo upload failed, upload manually',
+    stepPhotos: 'Step 1/3: Uploading photos...',
+    stepCategory: 'Step 2/3: Selecting category...',
+    stepFields: 'Step 3/3: Filling fields...',
+    manualFields: 'Fill in yourself',
+    failed: 'failed'
   }
 };
 
@@ -344,9 +244,9 @@ function expandSynonyms(levelText) {
   return Array.from(out).filter(Boolean);
 }
 
-// Expose for use in selectLevelGlobally
-// NOTE: categories.js already exports a richer synonym engine.
-// Don't overwrite it here (regression risk for categories like "Booster packs").
+// Expose for use in selectLevelGlobally.
+// NOTE: categories.js is not loaded on Vinted (popup only). Even when it was, this declaration
+// replaced its global expandSynonyms, so this has always been the engine used on Vinted.
 if (!window.expandSynonyms) {
   window.expandSynonyms = expandSynonyms;
 }
@@ -370,23 +270,9 @@ function updateButtonText() {
   }
 }
 
-// Detect current platform
+// Detect current platform (this script only runs on Vinted, see manifest)
 function detectPlatform() {
-  const url = window.location.href;
-  if (url.includes('vinted.')) return 'vinted';
-  if (url.includes('marktplaats.')) return 'marktplaats';
-  if (url.includes('facebook.com/marketplace')) return 'facebook';
-  if (url.includes('etsy.com')) return 'etsy';
-  if (url.includes('ebay.')) return 'ebay';
-  return null;
-}
-
-// Detect Marktplaats step (multi-step flow)
-function detectMarktplaatsStep() {
-  const url = window.location.href;
-  if (url.includes('/plaats') && !url.includes('/plaatsen')) return 'category';
-  if (url.includes('/advertentie-plaatsen') || url.includes('/plaatsen')) return 'details';
-  return 'unknown';
+  return /(^|\.)vinted\.[a-z.]+$/i.test(location.hostname) ? 'vinted' : null;
 }
 
 // Create paste button
@@ -500,7 +386,7 @@ function fillField(selectors, value, fieldName) {
   const field = findField(selectors);
   
   if (!field) {
-    console.log(`AutoPoster: ${fieldName} field not found`);
+    debugLog(`${fieldName} field not found`);
     return { success: false, fieldName };
   }
   
@@ -516,7 +402,7 @@ function fillField(selectors, value, fieldName) {
       field.dispatchEvent(new Event('blur', { bubbles: true }));
     }, 50);
     
-    console.log(`AutoPoster: ${fieldName} filled successfully`);
+    debugLog(`${fieldName} filled successfully`);
     return { success: true, fieldName };
   } catch (error) {
     console.error(`AutoPoster: Error filling ${fieldName}:`, error);
@@ -554,8 +440,6 @@ function waitForElement(selectors, timeout = 3000) {
 // Uses chevron state + input.value as success condition
 // ============================================
 
-const DEBUG_MODE = true;
-
 // Category picker diagnostics (for support/debug)
 let activeDropdownRoot = null;
 let __autoposterLastCategoryDiagnostics = null;
@@ -576,10 +460,10 @@ window.copyAutoPosterDiagnostics = async function copyAutoPosterDiagnostics() {
     const payload = __autoposterLastCategoryDiagnostics || { error: 'No diagnostics captured yet' };
     const text = JSON.stringify(payload, null, 2);
     await navigator.clipboard.writeText(text);
-    console.log('AutoPoster: ✅ Diagnostics copied to clipboard');
+    debugLog('✅ Diagnostics copied to clipboard');
     return payload;
   } catch (e) {
-    console.warn('AutoPoster: ❌ Failed to copy diagnostics', e);
+    debugWarn('❌ Failed to copy diagnostics', e);
     return __autoposterLastCategoryDiagnostics;
   }
 };
@@ -1113,7 +997,7 @@ function findCategoryInput() {
       const el = document.querySelector(sel);
       if (el && isElementVisible(el)) {
         debugLog(`✅ Found category input: ${sel}`);
-        console.log('AutoPoster: ✅ Category input found:', {
+        debugLog('✅ Category input found:', {
           tagName: el.tagName,
           testId: el.getAttribute('data-testid'),
           id: el.id,
@@ -1324,7 +1208,7 @@ function logDOMDiagnostics(searchTerms, options = {}) {
   };
 
   // ADMIN ONLY: Log to console
-  if (log && __autoposterIsAdmin) {
+  if (log && DEBUG_MODE) {
     console.group('AutoPoster: 🔍 DOM Diagnostics');
     console.log(`Found ${listboxes.length} [role="listbox"] elements`);
     console.log(`Found ${optionEls.length} [role="option"] elements`);
@@ -1367,7 +1251,7 @@ async function selectLevelGlobally(levelText) {
     debugLog(`[${scopeName}] Strategy 1: Exact text match...`);
     const exactResult = findExactTextMatch(searchTerms, scope);
     if (exactResult) {
-      if (__autoposterIsAdmin) {
+      if (DEBUG_MODE) {
         console.log(`AutoPoster: ✅ EXACT MATCH (${scopeName}) for "${exactResult.matchedTerm}"`, {
           tag: exactResult.element.tagName,
           text: exactResult.element.textContent?.trim().slice(0, 50)
@@ -1385,7 +1269,7 @@ async function selectLevelGlobally(levelText) {
     debugLog(`[${scopeName}] Strategy 2: Nested text match...`);
     const nestedResult = findNestedTextMatch(searchTerms, scope);
     if (nestedResult) {
-      if (__autoposterIsAdmin) {
+      if (DEBUG_MODE) {
         console.log(`AutoPoster: ✅ NESTED MATCH (${scopeName}) for "${nestedResult.matchedTerm}"`, {
           tag: nestedResult.element.tagName,
           text: nestedResult.element.textContent?.trim().slice(0, 50)
@@ -1403,7 +1287,7 @@ async function selectLevelGlobally(levelText) {
     debugLog(`[${scopeName}] Strategy 3: Fuzzy match...`);
     const fuzzyResult = findFuzzyMatch(searchTerms, 0.4, scope);
     if (fuzzyResult) {
-      if (__autoposterIsAdmin) {
+      if (DEBUG_MODE) {
         console.log(
           `AutoPoster: ✅ FUZZY MATCH (${scopeName}) for "${fuzzyResult.matchedTerm}" (score: ${fuzzyResult.score.toFixed(2)})`,
           { tag: fuzzyResult.element.tagName, text: fuzzyResult.element.textContent?.trim().slice(0, 50) }
@@ -1431,9 +1315,9 @@ async function selectLevelGlobally(levelText) {
   if (okDoc) return true;
   
   // ALL STRATEGIES FAILED - Log detailed error (ADMIN ONLY)
-  domDiagnostics = logDOMDiagnostics(searchTerms, { log: __autoposterIsAdmin });
+  domDiagnostics = logDOMDiagnostics(searchTerms, { log: DEBUG_MODE });
   
-  if (__autoposterIsAdmin) {
+  if (DEBUG_MODE) {
     console.error(`AutoPoster: ❌ FAILED to find "${levelText}"`);
     const troubleshooting = {
       searchTerms,
@@ -1462,7 +1346,7 @@ async function selectLevelGlobally(levelText) {
   });
   
   // ADMIN ONLY: Log diagnostics JSON
-  if (__autoposterIsAdmin) {
+  if (DEBUG_MODE) {
     try {
       console.log('AutoPoster: DIAGNOSTICS_JSON:', JSON.stringify(__autoposterLastCategoryDiagnostics || {}, null, 2));
     } catch {
@@ -1473,29 +1357,8 @@ async function selectLevelGlobally(levelText) {
   return false;
 }
 
-// Global flag for admin mode (loaded from storage)
-let __autoposterIsAdmin = false;
-
-// Load admin status from storage (set by popup.js)
-function loadAdminStatus() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get(['isAdminUser'], (result) => {
-      __autoposterIsAdmin = result.isAdminUser === true;
-      resolve(__autoposterIsAdmin);
-    });
-  });
-}
-
+// "Copy debug info" button: DEV_MODE builds only (see init)
 function createDebugButton() {
-  // SECURITY: Only show debug button for admin users
-  if (!__autoposterIsAdmin) {
-    // Return invisible placeholder to maintain DOM structure
-    const placeholder = document.createElement('div');
-    placeholder.id = 'autoposter-debug-btn';
-    placeholder.style.display = 'none';
-    return placeholder;
-  }
-  
   const btn = document.createElement('button');
   btn.id = 'autoposter-debug-btn';
   btn.type = 'button';
@@ -1688,7 +1551,7 @@ async function selectVintedCategory(categoryPath) {
     showNotification(`📁 Select category: ${repairedPath}`, 'info', 8000);
 
     // Persist stats for admin panel
-    if (__autoposterIsAdmin) {
+    if (DEBUG_MODE) {
       await recordVintedCategoryAttempt({ url: location.href, requestedPath: categoryPath, repairedPath });
       await recordVintedCategoryResult(false, repairedPath, { code: 'INPUT_NOT_FOUND', failedLevel: null });
     }
@@ -1703,7 +1566,7 @@ async function selectVintedCategory(categoryPath) {
   }
 
   // Persist attempt (admin only)
-  if (__autoposterIsAdmin) {
+  if (DEBUG_MODE) {
     await recordVintedCategoryAttempt({ url: location.href, requestedPath: categoryPath, repairedPath });
   }
   
@@ -1735,10 +1598,10 @@ async function selectVintedCategory(categoryPath) {
   if (!openResult.opened) {
     const waitTime = spinnerInfo.stillLoading ? 'still loading after 4s' : '4.0s';
     const spinnerMsg = spinnerInfo.hadSpinner ? ` (spinner detected, waited ${spinnerInfo.waitedMs}ms)` : '';
-    console.warn(`AutoPoster: ⚠️ Dropdown options did not appear within ${waitTime}${spinnerMsg}`);
+    debugWarn(`⚠️ Dropdown options did not appear within ${waitTime}${spinnerMsg}`);
     showNotification(`📁 Select category manually: ${repairedPath}`, 'info', 8000);
 
-    if (__autoposterIsAdmin) {
+    if (DEBUG_MODE) {
       await recordVintedCategoryResult(false, repairedPath, {
         code: 'PICKER_NOT_OPENED',
         failedLevel: levels?.[0] || null,
@@ -1761,7 +1624,7 @@ async function selectVintedCategory(categoryPath) {
       debugLog(`Level "${level}" not found — trying fallback to "Other"...`);
       const fallbackSuccess = await selectLevelGlobally('Other');
       if (fallbackSuccess) {
-        console.log(`AutoPoster: ✅ Fallback to "Other" succeeded (original: "${level}")`);
+        debugLog(`✅ Fallback to "Other" succeeded (original: "${level}")`);
         showNotification(`📁 "${level}" niet beschikbaar → "Other" geselecteerd`, 'info', 5000);
         success = true;
       }
@@ -1780,7 +1643,7 @@ async function selectVintedCategory(categoryPath) {
           class: (activeDropdownRoot.className || '').toString().slice(0, 120)
         } : null
       });
-      console.error('AutoPoster: ❌ Category selection FAILED', {
+      debugWarn('❌ Category selection FAILED', {
         failedLevelIndex: i + 1,
         failedLevel: level,
         fullPath: levels.join(' > '),
@@ -1792,7 +1655,7 @@ async function selectVintedCategory(categoryPath) {
       const remainingPath = levels.slice(i).join(' > ');
       showNotification(`📁 Select manually: ${remainingPath}`, 'info', 8000);
 
-      if (__autoposterIsAdmin) {
+      if (DEBUG_MODE) {
         await recordVintedCategoryResult(false, repairedPath, {
           code: 'LABEL_NOT_FOUND',
           failedLevel: level,
@@ -1826,7 +1689,7 @@ async function selectVintedCategory(categoryPath) {
       await selectLevelGlobally('Anders');
     }
     if (otherFallback) {
-      console.log('AutoPoster: ✅ Auto-selected "Other" for unexpected sub-level');
+      debugLog('✅ Auto-selected "Other" for unexpected sub-level');
       showNotification('📁 Extra sub-categorie → "Other" geselecteerd', 'info', 5000);
     }
   }
@@ -1839,7 +1702,7 @@ async function selectVintedCategory(categoryPath) {
     setCategoryDiagnostics({ code: 'SUCCESS', finalValue: categoryInput.value });
     showNotification(`✅ Category: ${categoryInput.value}`, 'success', 3000);
 
-    if (__autoposterIsAdmin) {
+    if (DEBUG_MODE) {
       await recordVintedCategoryResult(true, repairedPath);
     }
 
@@ -1853,7 +1716,7 @@ async function selectVintedCategory(categoryPath) {
   // means we ended on an intermediate node (e.g. "Trading cards") and Vinted expects
   // one more level (booster packs / boxes / singles). Returning true here blocks the
   // rest of the autofill flow.
-  if (__autoposterIsAdmin) {
+  if (DEBUG_MODE) {
     await recordVintedCategoryResult(false, repairedPath, {
       code: 'VALUE_NOT_CONFIRMED',
       failedLevel: levels?.[levels.length - 1] || null,
@@ -2443,7 +2306,7 @@ async function uploadImagesToVinted(images) {
   debugLog(`Success: ${successCount}, Failed: ${failCount}`);
   
   if (failCount > 0) {
-    showNotification(`📷 ${successCount}/${images.length} ${t('photosUploaded')}. ${failCount} mislukt.`, 'warning', 5000);
+    showNotification(`📷 ${successCount}/${images.length} ${t('photosUploaded')}. ${failCount} ${t('failed')}.`, 'warning', 5000);
   } else if (successCount > 0) {
     showNotification(`📷 ${successCount} ${t('photosUploaded')}!`, 'success', 3000);
   } else {
@@ -2471,50 +2334,6 @@ function base64ToFile(base64, filename) {
   }
 }
 
-// Handle Marktplaats category autofill
-async function handleMarktplaatsCategoryFill(categoryText) {
-  const selectors = PLATFORM_SELECTORS.marktplaats;
-  
-  // Try to find category search box
-  const searchBox = await waitForElement(selectors.categorySearch, 3000);
-  
-  if (!searchBox) {
-    // Fallback: copy to clipboard
-    await navigator.clipboard.writeText(categoryText);
-    showNotification(`📋 Categorie gekopieerd: "${categoryText}"\n${t('copyFallback')}`, 'info', 6000);
-    return false;
-  }
-  
-  // Fill search box using native setter
-  showNotification(`🔍 ${t('searchingCategory')}`, 'info', 2000);
-  
-  searchBox.focus();
-  setNativeValue(searchBox, categoryText);
-  
-  // Wait for dropdown results
-  await new Promise(r => setTimeout(r, 1000));
-  
-  // Try to click first result
-  const result = findField(selectors.categoryResult);
-  if (result) {
-    result.click();
-    await new Promise(r => setTimeout(r, 500));
-    
-    // Try to click "Verder" button
-    const nextBtn = findField(selectors.nextButton);
-    if (nextBtn) {
-      nextBtn.click();
-    }
-    
-    showNotification(`✅ ${t('categorySelected')}`, 'success', 2000);
-    return true;
-  }
-  
-  // Fallback if no result found
-  showNotification(`💡 ${t('categoryHint')}: ${categoryText}`, 'info', 5000);
-  return false;
-}
-
 // Handle Vinted specific autofill
 // skipImageUpload: true if images were already uploaded in handlePaste() flow
 async function handleVintedAutofill(data, skipImageUpload = false) {
@@ -2526,11 +2345,11 @@ async function handleVintedAutofill(data, skipImageUpload = false) {
   
   // Try image upload (SKIP if already done in handlePaste)
   if (!skipImageUpload && data.savedImages && data.savedImages.length > 0) {
-    console.log('AutoPoster: Starting image upload with', data.savedImages.length, 'images');
+    debugLog('Starting image upload with', data.savedImages.length, 'images');
     await uploadImagesToVinted(data.savedImages);
     await new Promise(r => setTimeout(r, 800));
   } else if (skipImageUpload) {
-    console.log('AutoPoster: Skipping image upload (already done in handlePaste)');
+    debugLog('Skipping image upload (already done in handlePaste)');
   }
   
   // Fill title
@@ -2556,79 +2375,12 @@ async function handleVintedAutofill(data, skipImageUpload = false) {
   return results;
 }
 
-// Handle Marktplaats specific autofill
-async function handleMarktplaatsAutofill(data) {
-  const step = detectMarktplaatsStep();
-  const selectors = PLATFORM_SELECTORS.marktplaats;
-  const results = [];
-  
-  if (step === 'category') {
-    // On category page, show hint
-    showNotification(`💡 Selecteer je categorie, daarna kun je de rest invullen.`, 'info', 6000);
-    return results;
-  }
-  
-  // On details page, fill fields
-  await new Promise(r => setTimeout(r, 800)); // Wait for Marktplaats's slow loading
-  
-  // Fill title
-  if (data.lastTitle) {
-    await waitForElement(selectors.titleField, 5000);
-    results.push(fillField(selectors.titleField, data.lastTitle, t('title')));
-    await new Promise(r => setTimeout(r, 300));
-  }
-  
-  // Fill description
-  if (data.lastFormattedText) {
-    await waitForElement(selectors.descriptionField, 5000);
-    results.push(fillField(selectors.descriptionField, data.lastFormattedText, t('description')));
-    await new Promise(r => setTimeout(r, 300));
-  }
-  
-  // Fill price
-  if (data.lastPrice) {
-    await waitForElement(selectors.priceField, 5000);
-    results.push(fillField(selectors.priceField, data.lastPrice, t('price')));
-  }
-  
-  return results;
-}
-
-// Handle generic platform autofill
-async function handleGenericAutofill(platform, data) {
-  const selectors = PLATFORM_SELECTORS[platform];
-  if (!selectors) return [];
-  
-  const results = [];
-  
-  await new Promise(r => setTimeout(r, 500));
-  
-  // Fill title
-  if (data.lastTitle && selectors.titleField) {
-    results.push(fillField(selectors.titleField, data.lastTitle, t('title')));
-    await new Promise(r => setTimeout(r, 150));
-  }
-  
-  // Fill description
-  if (data.lastFormattedText && selectors.descriptionField) {
-    results.push(fillField(selectors.descriptionField, data.lastFormattedText, t('description')));
-    await new Promise(r => setTimeout(r, 150));
-  }
-  
-  // Fill price
-  if (data.lastPrice && selectors.priceField) {
-    results.push(fillField(selectors.priceField, data.lastPrice, t('price')));
-  }
-  
-  return results;
-}
-
 // Main paste handler with progress steps
 async function handlePaste() {
   const btn = document.getElementById('autoposter-paste-btn');
   const platform = detectPlatform();
   
-  if (!platform) {
+  if (!platform || !btn) {
     showNotification(t('platformNotRecognized'), 'error');
     return;
   }
@@ -2643,11 +2395,32 @@ async function handlePaste() {
       'lastFormattedText', 
       'lastTitle', 
       'lastPrice', 
-      'lastPlatform',
       'lastCategory',
       'lastCategoryPath',
+      'lastListingId',
+      'listingData',
       'savedImages'
     ]);
+
+    // Only paste text that belongs to the listing that is in the popup now (its photos are savedImages).
+    // Old or mismatched text is never combined with new photos.
+    const payloadIsCurrent = Boolean(data.lastListingId) &&
+      data.lastListingId === (data.listingData && data.listingData.listingId);
+    
+    debugLog('Retrieved data:', {
+      payloadIsCurrent,
+      hasFormattedText: !!data.lastFormattedText,
+      hasTitle: !!data.lastTitle,
+      hasPrice: !!data.lastPrice,
+      hasCategoryPath: !!data.lastCategoryPath,
+      imageCount: data.savedImages?.length || 0
+    });
+    
+    if (!payloadIsCurrent || (!data.lastFormattedText && !data.lastTitle)) {
+      showNotification(t('noData'), 'error');
+      resetButton(btn);
+      return;
+    }
 
     // Make listing context available for category repair & diagnostics.
     // (Previously this was often empty, so "Trading cards" couldn't be refined.)
@@ -2658,63 +2431,37 @@ async function handlePaste() {
       categoryPath: data.lastCategoryPath || null,
     };
     
-    console.log('AutoPoster: Retrieved data:', {
-      hasFormattedText: !!data.lastFormattedText,
-      hasTitle: !!data.lastTitle,
-      hasPrice: !!data.lastPrice,
-      hasCategoryPath: !!data.lastCategoryPath,
-      imageCount: data.savedImages?.length || 0
-    });
-    
-    if (!data.lastFormattedText && !data.lastTitle) {
-      showNotification(t('noData'), 'error');
-      resetButton(btn);
-      return;
-    }
-    
     // Track if we uploaded images (to avoid double upload in handleVintedAutofill)
     let imagesAlreadyUploaded = false;
     
-    // STEP 1: For Vinted, upload images FIRST (this triggers Vinted to render category dropdown)
-    if (platform === 'vinted' && data.savedImages && data.savedImages.length > 0) {
-      showNotification(`⏳ Stap 1/3: Foto's uploaden...`, 'info', 2000);
-      console.log('AutoPoster: Uploading images FIRST to trigger category dropdown render');
+    // STEP 1: Upload images FIRST (this triggers Vinted to render the category dropdown)
+    if (data.savedImages && data.savedImages.length > 0) {
+      showNotification(`⏳ ${t('stepPhotos')}`, 'info', 2000);
+      debugLog('Uploading images FIRST to trigger category dropdown render');
       await uploadImagesToVinted(data.savedImages);
       imagesAlreadyUploaded = true;
       await new Promise(r => setTimeout(r, 1500)); // Wait for Vinted UI to fully update
     }
     
     // STEP 2: Category selection (NOW the dropdown should be rendered after images)
-    if (platform === 'vinted' && data.lastCategoryPath) {
-      showNotification(`⏳ Stap 2/3: Categorie selecteren...`, 'info', 2000);
+    if (data.lastCategoryPath) {
+      showNotification(`⏳ ${t('stepCategory')}`, 'info', 2000);
       const categorySuccess = await selectVintedCategory(data.lastCategoryPath);
       if (!categorySuccess && data.lastCategory) {
         // Fallback to showing category hint
         showNotification(`💡 ${t('categoryHint')}: ${data.lastCategory}`, 'info', 4000);
       }
       await new Promise(r => setTimeout(r, 500));
-    } else if (platform === 'marktplaats' && detectMarktplaatsStep() === 'category' && data.lastCategory) {
-      showNotification(`⏳ ${t('step1Category')}`, 'info', 2000);
-      await handleMarktplaatsCategoryFill(data.lastCategory);
-      await new Promise(r => setTimeout(r, 500));
     }
     
     // STEP 3: Fill other fields
-    showNotification(`⏳ Stap 3/3: Velden invullen...`, 'info', 2000);
+    showNotification(`⏳ ${t('stepFields')}`, 'info', 2000);
     await new Promise(r => setTimeout(r, 300));
     
-    let results = [];
+    // Pass flag to skip image upload if already done
+    const results = await handleVintedAutofill(data, imagesAlreadyUploaded);
     
-    // Platform-specific handling (pass flag to skip image upload if already done)
-    if (platform === 'vinted') {
-      results = await handleVintedAutofill(data, imagesAlreadyUploaded);
-    } else if (platform === 'marktplaats') {
-      results = await handleMarktplaatsAutofill(data);
-    } else {
-      results = await handleGenericAutofill(platform, data);
-    }
-    
-    // STEP 3: Process results
+    // Process results
     const successfulFields = results.filter(r => r.success).map(r => r.fieldName);
     const failedFields = results.filter(r => !r.success).map(r => r.fieldName);
     
@@ -2722,7 +2469,7 @@ async function handlePaste() {
       if (failedFields.length > 0) {
         // Partial success
         showNotification(
-          `✅ ${t('step3Done')}\n${t('filledFields')}: ${successfulFields.join(', ')}\n⚠️ Handmatig: ${failedFields.join(', ')}`,
+          `✅ ${t('step3Done')}\n${t('filledFields')}: ${successfulFields.join(', ')}\n⚠️ ${t('manualFields')}: ${failedFields.join(', ')}`,
           'info',
           5000
         );
@@ -2830,74 +2577,83 @@ function addStyles() {
   document.head.appendChild(style);
 }
 
-// Check if on listing page
+// Only the Vinted sell page (/items/new) and edit page (/items/<id>/edit) get the paste button.
+// Optional language prefix (e.g. /fr/items/new) for multi-language Vinted sites.
+const LISTING_PATH_RE = /^(?:\/[a-z]{2}(?:-[a-z]{2})?)?\/items\/(?:new|\d+\/edit)\/?$/i;
+
 function isListingPage() {
-  const url = window.location.href;
-  return url.includes('/sell') || 
-    url.includes('/create') || 
-    url.includes('/new') ||
-    url.includes('/listing') ||
-    url.includes('/item/') ||
-    url.includes('/advertentie') ||
-    url.includes('/plaats') ||
-    url.includes('/plaatsen') ||
-    url.includes('/plaats-advertentie') ||
-    url.includes('advertentie-plaatsen');
+  return LISTING_PATH_RE.test(location.pathname);
+}
+
+function removeAutoposterButtons() {
+  document.getElementById('autoposter-paste-btn')?.remove();
+  document.getElementById('autoposter-debug-btn')?.remove();
+}
+
+// Remember which Vinted country site the user uses, so the popup opens the same one
+function rememberVintedOrigin() {
+  const origin = location.origin;
+  if (typeof AP_CONFIG !== 'undefined' && !AP_CONFIG.VINTED_ORIGINS.includes(origin)) return;
+  chrome.storage.local.get(['lastVintedOrigin'], (result) => {
+    if (result.lastVintedOrigin !== origin) {
+      chrome.storage.local.set({ lastVintedOrigin: origin });
+    }
+  });
+}
+
+// Show the button on sell/edit pages, remove it everywhere else
+let buttonTimer = null;
+function updatePasteButton() {
+  clearTimeout(buttonTimer);
+  buttonTimer = null;
+  if (!isListingPage()) {
+    removeAutoposterButtons();
+    return;
+  }
+  if (document.getElementById('autoposter-paste-btn')) return;
+  
+  // Give Vinted's form a moment to render
+  buttonTimer = setTimeout(() => {
+    buttonTimer = null;
+    if (!isListingPage() || document.getElementById('autoposter-paste-btn') || !document.body) return;
+    addStyles();
+    document.body.appendChild(createPasteButton());
+    if (DEBUG_MODE) {
+      document.body.appendChild(createDebugButton());
+      debugLog('Paste button added');
+    }
+  }, 1000);
 }
 
 // Initialize
-async function init() {
-  const platform = detectPlatform();
-  if (!platform) return;
+function init() {
+  if (!detectPlatform()) return;
   
-  // Load language setting
   loadLanguage();
+  rememberVintedOrigin();
+  updatePasteButton();
   
-  // Load admin status BEFORE creating buttons
-  await loadAdminStatus();
-  
-  // Wait for page to load
-  setTimeout(() => {
-    if (isListingPage()) {
-      addStyles();
-      
-      // Remove existing button if present
-      const existingBtn = document.getElementById('autoposter-paste-btn');
-      if (existingBtn) existingBtn.remove();
-
-      const existingDebugBtn = document.getElementById('autoposter-debug-btn');
-      if (existingDebugBtn) existingDebugBtn.remove();
-      
-      document.body.appendChild(createPasteButton());
-      document.body.appendChild(createDebugButton());
-      
-      // ADMIN ONLY: Log initialization
-      if (__autoposterIsAdmin) {
-        console.log('AutoPoster Pro: Paste button added for', platform, '(admin mode)');
-      }
+  // Vinted is a single-page app: watch the path cheaply (no DOM observer)
+  let lastPath = location.pathname;
+  const checkPath = () => {
+    if (location.pathname !== lastPath) {
+      lastPath = location.pathname;
+      updatePasteButton();
+    } else if (!buttonTimer && isListingPage() && !document.getElementById('autoposter-paste-btn')) {
+      // Button got removed by a page re-render: put it back
+      updatePasteButton();
     }
-  }, 2000);
+  };
+  window.addEventListener('popstate', checkPath);
+  setInterval(checkPath, 1000);
 }
 
-// Run on page load and URL changes
 init();
 
-// Watch for SPA navigation
-let lastUrl = location.href;
-new MutationObserver(() => {
-  const url = location.href;
-  if (url !== lastUrl) {
-    lastUrl = url;
-    init();
-  }
-}).observe(document, { subtree: true, childList: true });
-
 // Listen for language changes
-chrome.storage.onChanged.addListener((changes) => {
-  if (changes.language) {
-    currentLang = changes.language.newValue || 'nl';
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.language) {
+    currentLang = changes.language.newValue || 'en';
     updateButtonText();
   }
 });
-
-console.log('AutoPoster Pro content script loaded');
