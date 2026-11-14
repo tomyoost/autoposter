@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import SiteFooter from "@/components/SiteFooter";
-import { CONTROLLER, PRIVACY_LAST_UPDATED, PRODUCT_NAME, VINTED_DOMAINS } from "@/config/site";
+import { CONTROLLER, GEMINI_PAID_TIER, PRIVACY_LAST_UPDATED, PRODUCT_NAME, VINTED_DOMAINS } from "@/config/site";
 
 const GUMROAD_PRIVACY_URL = "https://gumroad.com/privacy";
 const GEMINI_TERMS_URL = "https://ai.google.dev/gemini-api/terms";
@@ -120,12 +120,23 @@ const PolicyNl = () => (
       </Section>
 
       <Section title="Google Gemini">
-        <P>
-          We gebruiken de betaalde Gemini API van Google. Volgens de{" "}
-          <ExtLink href={GEMINI_TERMS_URL}>voorwaarden van Google voor betaalde diensten</ExtLink> gebruikt Google je
-          foto's en tekst niet om zijn modellen te trainen of zijn producten te verbeteren. Google bewaart ze een
-          beperkte tijd, alleen om misbruik op te sporen, en kan ze daarbij tijdelijk buiten de EU opslaan.
-        </P>
+        {GEMINI_PAID_TIER ? (
+          <P>
+            We gebruiken de betaalde Gemini API van Google. Volgens de{" "}
+            <ExtLink href={GEMINI_TERMS_URL}>voorwaarden van Google voor betaalde diensten</ExtLink> gebruikt Google je
+            foto's en tekst niet om zijn modellen te trainen of zijn producten te verbeteren. Google bewaart ze een
+            beperkte tijd, alleen om misbruik op te sporen, en kan ze daarbij tijdelijk buiten de EU opslaan.
+          </P>
+        ) : (
+          <P>
+            We gebruiken op dit moment de gratis versie van de Gemini API van Google. Volgens de{" "}
+            <ExtLink href={GEMINI_TERMS_URL}>voorwaarden van Google</ExtLink> mag Google foto's en tekst die via de
+            gratis versie binnenkomen gebruiken om zijn producten te verbeteren, en kunnen medewerkers van Google ze
+            daarbij inzien. Zet daarom geen persoonlijke gegevens op je foto's (zoals een adreslabel of je gezicht).
+            Google kan de gegevens buiten de EU opslaan. Stappen we over op de betaalde versie, dan passen we deze
+            tekst aan.
+          </P>
+        )}
       </Section>
 
       <Section title="Betalen en e-mail">
@@ -284,12 +295,22 @@ const PolicyEn = () => (
       </Section>
 
       <Section title="Google Gemini">
-        <P>
-          We use Google's paid Gemini API. Under{" "}
-          <ExtLink href={GEMINI_TERMS_URL}>Google's terms for paid services</ExtLink>, Google does not use your photos
-          or text to train its models or improve its products. Google keeps them for a limited period, only to detect
-          abuse, and may store them temporarily outside the EU while doing so.
-        </P>
+        {GEMINI_PAID_TIER ? (
+          <P>
+            We use Google's paid Gemini API. Under{" "}
+            <ExtLink href={GEMINI_TERMS_URL}>Google's terms for paid services</ExtLink>, Google does not use your photos
+            or text to train its models or improve its products. Google keeps them for a limited period, only to detect
+            abuse, and may store them temporarily outside the EU while doing so.
+          </P>
+        ) : (
+          <P>
+            We currently use the free version of Google's Gemini API. Under{" "}
+            <ExtLink href={GEMINI_TERMS_URL}>Google's terms</ExtLink>, Google may use photos and text sent through the
+            free version to improve its products, and Google staff may review them for that purpose. Please do not
+            show personal data in your photos (such as an address label or your face). Google may store the data
+            outside the EU. If we move to the paid version, we will update this text.
+          </P>
+        )}
       </Section>
 
       <Section title="Payment and email">
