@@ -9,6 +9,7 @@ const PLATFORM_SELECTORS = {
   vinted: {
     // Enhanced selectors for Vinted's dynamic UI
     titleField: [
+      'input[data-testid="title--input"]',
       'input[data-testid="title-input"]',
       'input[name="title"]',
       '.web_ui__Input__input input[type="text"]',
@@ -18,6 +19,7 @@ const PLATFORM_SELECTORS = {
       'form input[type="text"]:first-of-type'
     ],
     descriptionField: [
+      'textarea[data-testid="description--input"]',
       'textarea[data-testid="description-input"]',
       'textarea[name="description"]',
       '.web_ui__Textarea__textarea',
@@ -27,6 +29,7 @@ const PLATFORM_SELECTORS = {
       'form textarea'
     ],
     priceField: [
+      'input[data-testid="price-input--input"]',
       'input[data-testid="price-input"]',
       'input[name="price"]',
       'input[inputmode="decimal"]',
@@ -2046,6 +2049,10 @@ function repairVintedCategoryPath(path) {
 
 // Count visible photo thumbnails on page
 function countVisibleThumbnails() {
+  // Vinted (gezien op het echte formulier, 15-11-2026): geüploade foto's staan in dit raster
+  const grid = document.querySelector('[data-testid="media-upload-grid"]');
+  if (grid) return grid.children.length;
+
   const selectors = [
     '[class*="photo"] img',
     '[class*="thumbnail"] img',
@@ -2443,7 +2450,15 @@ async function handlePaste() {
       await new Promise(r => setTimeout(r, 1500)); // Wait for Vinted UI to fully update
     }
     
-    // STEP 2: Category selection (NOW the dropdown should be rendered after images)
+    // STEP 2: Title, description and price first: the most important fields, and quick.
+    // (Vinted also uses the title to suggest a category.)
+    showNotification(`⏳ ${t('stepFields')}`, 'info', 2000);
+    await new Promise(r => setTimeout(r, 300));
+    
+    // Pass flag to skip image upload if already done
+    const results = await handleVintedAutofill(data, imagesAlreadyUploaded);
+    
+    // STEP 3: Category last: the picker is the most fragile part and may take a few seconds.
     if (data.lastCategoryPath) {
       showNotification(`⏳ ${t('stepCategory')}`, 'info', 2000);
       const categorySuccess = await selectVintedCategory(data.lastCategoryPath);
@@ -2453,13 +2468,6 @@ async function handlePaste() {
       }
       await new Promise(r => setTimeout(r, 500));
     }
-    
-    // STEP 3: Fill other fields
-    showNotification(`⏳ ${t('stepFields')}`, 'info', 2000);
-    await new Promise(r => setTimeout(r, 300));
-    
-    // Pass flag to skip image upload if already done
-    const results = await handleVintedAutofill(data, imagesAlreadyUploaded);
     
     // Process results
     const successfulFields = results.filter(r => r.success).map(r => r.fieldName);
