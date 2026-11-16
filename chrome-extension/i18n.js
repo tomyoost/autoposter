@@ -52,7 +52,7 @@ const translations = {
     
     // Buttons
     generateAI: 'Genereer AI Beschrijving',
-    analyzePhoto: 'Analyseer Foto met AI',
+    analyzePhoto: 'Analyseer foto\'s met AI',
     useTemplate: 'Gebruik Template',
     copy: 'Kopieer',
     open: 'Open',
@@ -76,7 +76,7 @@ const translations = {
     uploadText: 'Klik of sleep foto\'s hier',
     uploadLimit: 'Max 10 foto\'s (tot 15 MB per foto)',
     aiHintNoPhoto: 'Upload een foto om AI analyse te activeren',
-    aiHintReady: 'Klik om de eerste foto te analyseren en het formulier automatisch in te vullen',
+    aiHintReady: 'Klik om je foto\'s (tot 6) te laten analyseren en het formulier in te vullen',
     
     // Platform section
     platformDescription: 'Open Vinted vanuit hier en klik daar rechtsonder op \'Plakken\'. Foto\'s, titel, beschrijving, prijs, categorie, merk, maat, staat en kleur worden dan ingevuld.',
@@ -178,14 +178,14 @@ const translations = {
     popular: 'Populair',
     
     // Tier names
-    tierFree: 'Free',
+    tierFree: 'Gratis',
     tierStarter: 'Starter',
     tierPro: 'Pro',
     
     // Tier descriptions
-    tierFreeDesc: 'Perfect voor casual sellers',
+    tierFreeDesc: 'Voor wie af en toe iets verkoopt',
     tierStarterDesc: 'Voor regelmatige verkopers',
-    tierProDesc: 'Voor power resellers',
+    tierProDesc: 'Voor wie veel verkoopt',
     
     // Features
     featureAnalyses: 'AI-analyses per maand',
@@ -310,7 +310,7 @@ const translations = {
     
     // Buttons
     generateAI: 'Generate AI Description',
-    analyzePhoto: 'Analyze Photo with AI',
+    analyzePhoto: 'Analyse photos with AI',
     useTemplate: 'Use Template',
     copy: 'Copy',
     open: 'Open',
@@ -334,7 +334,7 @@ const translations = {
     uploadText: 'Click or drag photos here',
     uploadLimit: 'Max 10 photos (up to 15 MB each)',
     aiHintNoPhoto: 'Upload a photo to enable AI analysis',
-    aiHintReady: 'Click to analyze the first photo and auto-fill the form',
+    aiHintReady: 'Click to analyse your photos (up to 6) and fill in the form',
     
     // Platform section
     platformDescription: 'Open Vinted from here and click \'Paste\' at the bottom right. Photos, title, description, price, category, brand, size, condition and colour are filled in for you.',
