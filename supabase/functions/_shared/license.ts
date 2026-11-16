@@ -2,14 +2,31 @@
 //
 // Sleutels komen van Gumroad zelf (licentiesleutels aan op het product). De server controleert ze bij
 // Gumroad en onthoudt de uitkomst in public.licenses. Handmatige sleutels (source = 'manual') blijven werken.
-import { db } from "./db.ts";
+import { db, getSetting } from "./db.ts";
 
 export type Tier = "free" | "starter" | "pro";
 
-/** AI-analyses per maand zoals de klant ze ziet (-1 = onbeperkt). */
+/** AI-analyses per maand zoals de klant ze ziet (-1 = onbeperkt). Standaard; de echte waarden staan in app_settings.tier_limits. */
 export const ANALYSIS_LIMITS: Record<Tier, number> = { free: 3, starter: 50, pro: -1 };
 /** Tekstgeneraties (beschrijving/titel) per maand zoals de klant ze ziet (-1 = onbeperkt). */
 export const GENERATION_LIMITS: Record<Tier, number> = { free: 15, starter: 250, pro: -1 };
+
+type LimitTable = { analysis: Record<Tier, number>; generation: Record<Tier, number> };
+const TIERS: Tier[] = ["free", "starter", "pro"];
+
+/** Leest de grenzen uit app_settings (60 s cache). Zo gaan ze op de omzetdag in één update om, zonder nieuwe versie. */
+export async function loadTierLimits(): Promise<void> {
+  const raw = await getSetting<unknown>("tier_limits", null);
+  if (!raw || typeof raw !== "object") return;
+  const table = raw as Partial<LimitTable>;
+  for (const kind of ["analysis", "generation"] as const) {
+    const target = kind === "analysis" ? ANALYSIS_LIMITS : GENERATION_LIMITS;
+    for (const tier of TIERS) {
+      const v = table[kind]?.[tier];
+      if (Number.isInteger(v) && (v as number) >= -1) target[tier] = v as number;
+    }
+  }
+}
 /** Grens voor redelijk gebruik bij "onbeperkt" (Pro): beschermt tegen gedeelde of gelekte sleutels. */
 const FAIR_USE_ANALYSES = 2000;
 const FAIR_USE_GENERATIONS = 6000;
@@ -223,6 +240,7 @@ async function verifyWithGumroad(key: string, preferredProductId: string | null,
  * (gebruikt bij activeren en na upgraden).
  */
 export async function resolveLicense(rawKey: unknown, opts: { refresh?: boolean } = {}): Promise<ResolveResult> {
+  await loadTierLimits();
   const key = normalizeKey(rawKey);
   if (!key) return fail("NO_LICENSE");
   if (!ANY_KEY_RE.test(key)) return fail("BAD_FORMAT");
@@ -351,4 +369,43 @@ export async function reserveUsage(
 export async function releaseUsage(licenseId: string, month: string, kind: UsageKind): Promise<void> {
   const { error } = await db().rpc("release_usage", { p_license_id: licenseId, p_month_year: month, p_kind: kind });
   if (error) console.error("release_usage mislukt:", error.message);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Opnieuw analyseren met precies dezelfde foto's binnen 10 minuten telt niet mee (max. 3 keer per set).
+const REPEAT_WINDOW_MS = 10 * 60 * 1000;
+const MAX_FREE_REPEATS = 3;
+
+export async function photosHash(photos: string[]): Promise<string> {
+  const bytes = new TextEncoder().encode(photos.join("|"));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** True als deze set foto's in de laatste 10 minuten al is meegeteld (en er nog gratis herhalingen over zijn). */
+export async function isFreeRepeat(licenseId: string, hash: string): Promise<boolean> {
+  const { data, error } = await db()
+    .from("analysis_repeats")
+    .select("created_at, repeats")
+    .eq("license_id", licenseId)
+    .eq("photos_hash", hash)
+    .maybeSingle();
+  if (error || !data) return false;
+  const age = Date.now() - new Date(data.created_at as string).getTime();
+  return age < REPEAT_WINDOW_MS && (data.repeats as number) < MAX_FREE_REPEATS;
+}
+
+/** Na een geslaagde analyse: een meegetelde scan start een nieuw venster, een gratis herhaling telt op. */
+export async function rememberScan(licenseId: string, hash: string, wasFreeRepeat: boolean): Promise<void> {
+  const table = db().from("analysis_repeats");
+  if (wasFreeRepeat) {
+    const { data } = await table.select("repeats").eq("license_id", licenseId).eq("photos_hash", hash).maybeSingle();
+    await db().from("analysis_repeats")
+      .update({ repeats: ((data?.repeats as number) ?? 0) + 1 })
+      .eq("license_id", licenseId).eq("photos_hash", hash);
+    return;
+  }
+  await table.upsert({ license_id: licenseId, photos_hash: hash, created_at: new Date().toISOString(), repeats: 0 }, { onConflict: "license_id,photos_hash" });
+  // Oude rijen van deze licentie opruimen (houdt de tabel klein)
+  await db().from("analysis_repeats").delete().eq("license_id", licenseId).lt("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 }

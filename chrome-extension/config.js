@@ -25,7 +25,7 @@ const AP_CONFIG = (() => {
     FEEDBACK_URL: 'https://forms.gle/qgcvXNHsqoaGqoSY8',
 
     // AI photo analyses per month, for display only (-1 = unlimited). The server enforces the real limits.
-    TIER_LIMITS: Object.freeze({ free: 3, starter: 50, pro: -1 }),
+    TIER_LIMITS: Object.freeze({ free: 5, starter: 200, pro: 1000 }),
 
     // Vinted sites the extension works on (same list as host_permissions in manifest.json).
     VINTED_ORIGINS: Object.freeze([

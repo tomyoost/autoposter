@@ -3,7 +3,11 @@ import { callGemini } from "../_shared/gemini.ts";
 import {
   currentMonth,
   enforcedLimit,
+  isFreeRepeat,
   licenseErrorStatus,
+  photosHash,
+  readAnalysesUsed,
+  rememberScan,
   releaseUsage,
   reserveUsage,
   resolveLicense,
@@ -263,9 +267,15 @@ Deno.serve(async (req) => {
     }
     const { license } = result;
 
-    // Eén analyse reserveren (atomisch, op de server)
+    // Dezelfde foto's binnen 10 minuten opnieuw: telt niet mee
     const month = currentMonth();
-    const reservation = await reserveUsage(license.id, month, "analysis", enforcedLimit("analysis", license.tier));
+    const hash = await photosHash((imageList as string[]).slice(0, MAX_IMAGES_FOR_AI));
+    const freeRepeat = await isFreeRepeat(license.id, hash).catch(() => false);
+
+    // Eén analyse reserveren (atomisch, op de server)
+    const reservation = freeRepeat
+      ? { success: true, count: await readAnalysesUsed(license.id, month) }
+      : await reserveUsage(license.id, month, "analysis", enforcedLimit("analysis", license.tier));
     if (!reservation) return json({ error: "Server error", error_code: "SERVER_ERROR" }, 500);
     if (!reservation.success) {
       return json(
@@ -277,7 +287,7 @@ Deno.serve(async (req) => {
         429,
       );
     }
-    reserved = { licenseId: license.id, month };
+    if (!freeRepeat) reserved = { licenseId: license.id, month };
 
     const tree = clientCatalog(rawCatalog) ?? snapshotCatalog();
     const started = Date.now();
@@ -324,7 +334,7 @@ Deno.serve(async (req) => {
     }
 
     if (!s1) {
-      await releaseUsage(reserved.licenseId, reserved.month, "analysis");
+      if (reserved) await releaseUsage(reserved.licenseId, reserved.month, "analysis");
       reserved = null;
       return aiError(language, lastCode, lastStatus);
     }
@@ -376,7 +386,7 @@ Deno.serve(async (req) => {
 
     // Is de gebruiker intussen weg (popup gesloten), dan telt deze analyse niet.
     if (req.signal.aborted) {
-      await releaseUsage(reserved.licenseId, reserved.month, "analysis");
+      if (reserved) await releaseUsage(reserved.licenseId, reserved.month, "analysis");
       reserved = null;
       return json({ error: "Client went away", error_code: "CLIENT_GONE" }, 499);
     }
@@ -437,7 +447,9 @@ Deno.serve(async (req) => {
     };
 
     console.log(`[${requestId}] analyse klaar: stap 1 ${s1Model} ${s1Ms} ms, stap 2 ${s2Model || "lexicaal"} ${s2Ms} ms, boom ${tree.source}`);
-    return json({ analysis, usage: usageView(license.tier, reservation.count) });
+    await rememberScan(license.id, hash, freeRepeat).catch((e) => console.warn(`[${requestId}] herhaling niet bewaard: ${e}`));
+    if (freeRepeat) console.log(`[${requestId}] herhaalde scan, niet meegeteld`);
+    return json({ analysis, usage: usageView(license.tier, reservation.count), repeat: freeRepeat || undefined });
   } catch (error) {
     console.error(`[${requestId}] analyze-image fout:`, error instanceof Error ? error.message : error);
     if (reserved) await releaseUsage(reserved.licenseId, reserved.month, "analysis");
