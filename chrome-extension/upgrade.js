@@ -25,7 +25,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function loadTheme() {
   chrome.storage.local.get(['theme'], (result) => {
-    document.body.setAttribute('data-theme', result.theme || 'dark');
+    const theme = result.theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    document.body.setAttribute('data-theme', theme);
   });
 }
 
@@ -35,13 +37,26 @@ function updateUI() {
   
   // Update language toggle
   const langToggle = document.getElementById('langToggle');
-  langToggle.textContent = lang === 'nl' ? '🇳🇱' : '🇬🇧';
+  langToggle.textContent = lang === 'nl' ? 'NL' : 'EN';
+  document.documentElement.lang = lang;
   langToggle.title = lang === 'nl' ? 'Switch to English' : 'Wissel naar Nederlands';
   
   // Update all i18n elements
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.dataset.i18n;
     el.textContent = t(key);
+  });
+
+  // Getallen en prijzen in de schrijfwijze van de taal (NL: 1.000 en €29,99; EN: 1,000 and €29.99)
+  const locale = lang === 'nl' ? 'nl-NL' : 'en-GB';
+  document.querySelectorAll('[data-num]').forEach(el => {
+    el.textContent = Number(el.dataset.num).toLocaleString(locale);
+  });
+  document.querySelectorAll('[data-price]').forEach(el => {
+    const price = Number(el.dataset.price);
+    el.textContent = new Intl.NumberFormat(locale, {
+      style: 'currency', currency: 'EUR', minimumFractionDigits: price % 1 ? 2 : 0,
+    }).format(price);
   });
 }
 

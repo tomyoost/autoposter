@@ -1,443 +1,294 @@
-/* AutoPoster Pro - Upgrade Page Styles */
+/* Abonnementen (in de popup), 1.3.0. Basis in ui.css.
+   De drie plannen staan in één paneel met scheidingslijnen, niet als drie losse kaarten. */
 
-/* Container */
+body {
+  width: 600px;
+}
+
 .upgrade-container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 20px;
+  padding-bottom: 8px;
 }
 
-/* Header */
 .upgrade-header {
-  text-align: center;
-  margin-bottom: 20px;
-  position: relative;
-}
-
-.upgrade-header h1 {
-  font-size: 24px;
-  font-weight: 700;
-  margin-bottom: 4px;
-  background: linear-gradient(135deg, var(--primary), #a855f7);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.upgrade-header .subtitle {
-  color: var(--text-secondary);
-  font-size: 14px;
-}
-
-.back-btn {
-  position: absolute;
-  left: 0;
-  top: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 13px;
   display: flex;
   align-items: center;
-  gap: 4px;
-  transition: all 0.2s ease;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 10px 0 8px;
 }
 
-.back-btn:hover {
-  background: var(--primary);
-  border-color: var(--primary);
+.back-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
-.lang-toggle {
-  position: absolute;
-  right: 0;
-  top: 0;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 16px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.upgrade-intro,
+.pricing-grid,
+.buy-hint,
+.license-section,
+.faq-section,
+.upgrade-footer {
+  margin-left: 8px;
+  margin-right: 8px;
 }
 
-.lang-toggle:hover {
-  background: var(--primary);
-  border-color: var(--primary);
+/* Het vel: alles onder de kopbalk staat op één wit vlak */
+.upgrade-container > :not(.upgrade-header) {
+  background: var(--sheet);
+  padding-left: 20px;
+  padding-right: 20px;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
 }
 
-/* Current Plan Banner */
+.upgrade-intro {
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+}
+
+.upgrade-footer {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-sheet) var(--radius-sheet);
+}
+
+.upgrade-intro h1 {
+  font-size: var(--fs-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.upgrade-intro .subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
 .current-plan {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  margin-bottom: 20px;
-}
-
-.current-label {
-  color: var(--text-secondary);
+  margin-top: 12px;
   font-size: 13px;
+  color: var(--muted);
 }
 
 .current-tier {
-  font-weight: 700;
-  color: var(--primary);
-  font-size: 14px;
+  margin-left: 4px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .current-usage {
-  background: var(--bg-tertiary);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
+  margin-left: 6px;
 }
 
-/* Pricing Grid */
+/* ---------- Plannen ---------- */
+
+.pricing-grid {
+  padding-top: 18px;
+  padding-bottom: 0;
+}
+
 .pricing-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* Pricing Card */
 .pricing-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
   position: relative;
-  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 14px 14px;
+  border: 1px solid var(--border);
+  background: var(--sheet);
 }
 
-.pricing-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+.pricing-card:first-child {
+  border-radius: 10px 0 0 10px;
 }
 
-.pricing-card.popular {
-  border-color: var(--primary);
-  background: linear-gradient(135deg, var(--bg-secondary), rgba(99, 102, 241, 0.1));
+.pricing-card:last-child {
+  border-radius: 0 10px 10px 0;
+}
+
+.pricing-card + .pricing-card {
+  border-left: 0;
 }
 
 .pricing-card.current {
-  border-color: var(--success);
-  background: linear-gradient(135deg, var(--bg-secondary), rgba(16, 185, 129, 0.1));
-}
-
-.popular-badge {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, var(--primary), #a855f7);
-  color: white;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 4px 12px;
-  border-radius: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.card-header {
-  text-align: center;
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+  background: var(--raised);
 }
 
 .card-header h2 {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 4px;
+  display: inline;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* "Populair" staat naast de naam, niet als badge erboven */
+.popular-badge {
+  position: absolute;
+  top: 17px;
+  right: 12px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--link);
+  font-size: 11.5px;
+  font-weight: 600;
 }
 
 .tier-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-bottom: 12px;
+  margin-top: 4px;
+  min-height: 2.8em;
+  font-size: var(--fs-small);
+  line-height: 1.4;
+  color: var(--muted);
 }
 
 .price {
   display: flex;
   align-items: baseline;
-  justify-content: center;
-  gap: 2px;
+  gap: 3px;
+  margin-top: 10px;
 }
 
 .price .amount {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .price .period {
-  font-size: 12px;
-  color: var(--text-muted);
+  font-size: var(--fs-small);
+  color: var(--muted);
 }
 
-/* Features List */
 .features {
   list-style: none;
-  padding: 0;
-  margin: 0 0 16px 0;
+  margin: 12px 0 16px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--rule);
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
-.feature-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  padding: 6px 0;
-}
-
-.feature-item.disabled {
-  color: var(--text-muted);
-  opacity: 0.6;
+.features .num {
+  font-weight: 600;
+  color: var(--text);
 }
 
 .feature-icon {
-  flex-shrink: 0;
-  font-size: 12px;
+  display: none;
 }
 
-.feature-item:not(.disabled) .feature-icon {
-  color: var(--success);
-}
-
-.feature-item.disabled .feature-icon {
-  color: var(--text-muted);
-}
-
-/* Buttons */
 .pricing-card .btn {
   width: 100%;
-  padding: 10px 16px;
-  border-radius: var(--radius-sm);
+  margin-top: auto;
+  min-height: 36px;
+  padding: 7px 10px;
   font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
 }
 
-.pricing-card .btn-primary {
-  background: linear-gradient(135deg, var(--primary), #a855f7);
-  color: white;
-}
-
-.pricing-card .btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
-
-.pricing-card .btn-secondary {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: white;
-}
-
-.pricing-card .btn-secondary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
-}
-
-.pricing-card .btn-outline {
+.pricing-card .current-btn:disabled {
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
+  border-color: transparent;
+  color: var(--muted);
 }
 
-.pricing-card .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+.license-desc.buy-hint {
+  margin-top: 0;
+  padding-top: 10px;
+  font-size: var(--fs-small);
+  color: var(--muted);
 }
 
-.pricing-card .current-btn {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid var(--success);
-  color: var(--success);
-}
+/* ---------- Sleutel ---------- */
 
-/* License Key Section */
 .license-section {
-  background: linear-gradient(135deg, var(--bg-secondary), rgba(99, 102, 241, 0.05));
-  border: 1px solid var(--primary);
-  border-radius: var(--radius);
-  padding: 20px;
-  margin-bottom: 20px;
+  padding-top: 22px;
+  padding-bottom: 4px;
 }
 
-.license-section h3 {
-  font-size: 16px;
+.license-section h3,
+.faq-section h3 {
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  font-size: var(--fs-section);
   font-weight: 600;
-  margin-bottom: 8px;
-  color: var(--text-primary);
 }
 
 .license-desc {
+  margin-top: 4px;
   font-size: 13px;
-  color: var(--text-secondary);
-  margin-bottom: 16px;
+  color: var(--muted);
 }
 
 .license-input-wrapper {
   display: flex;
-  gap: 12px;
-  align-items: stretch;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .license-key-input {
   flex: 1;
-  padding: 16px 20px;
-  background: var(--bg-primary);
-  border: 2px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  text-align: center;
-  transition: all 0.2s ease;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
 }
 
-.license-key-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.2);
-}
-
-.license-key-input::placeholder {
-  color: var(--text-muted);
-  text-transform: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  letter-spacing: normal;
-  font-size: 15px;
-}
-
-.btn-activate {
-  padding: 16px 24px;
-  background: linear-gradient(135deg, var(--primary), #a855f7);
-  color: white;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.btn-activate:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-}
-
-.btn-activate:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+#activateLicenseBtn {
+  background: var(--sheet);
 }
 
 .license-message {
-  margin-top: 12px;
-  font-size: 14px;
-  min-height: 20px;
+  margin-top: 8px;
+  font-size: 13px;
 }
 
-.license-message.success {
-  color: var(--success);
+.license-message:empty {
+  display: none;
 }
 
-.license-message.error {
-  color: var(--error);
-}
+.license-message.success { color: var(--positive); }
+.license-message.error { color: var(--negative); }
 
 .refresh-plan-help {
+  margin-top: 14px;
+}
+
+#refreshPlanBtn {
   margin-top: 8px;
-  margin-bottom: 8px;
 }
 
-.buy-hint {
-  text-align: center;
-}
+/* ---------- Vragen ---------- */
 
-/* FAQ Section */
 .faq-section {
-  background: var(--bg-secondary);
-  border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.faq-section h3 {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--text-primary);
+  padding-top: 22px;
 }
 
 .faq-item {
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.faq-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+  margin-top: 14px;
 }
 
 .faq-item strong {
   display: block;
-  font-size: 12px;
-  color: var(--text-primary);
-  margin-bottom: 4px;
+  font-size: var(--fs-body);
+  font-weight: 600;
 }
 
 .faq-item p {
-  font-size: 11px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
-/* Footer */
 .upgrade-footer {
-  text-align: center;
-  padding: 12px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.upgrade-footer a {
-  color: var(--primary);
-  text-decoration: none;
-}
-
-.upgrade-footer a:hover {
-  text-decoration: underline;
-}
-
-/* Light Mode */
-body[data-theme="light"] .upgrade-header h1 {
-  background: linear-gradient(135deg, var(--primary), #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  padding-top: 20px;
+  font-size: 13px;
+  color: var(--muted);
 }

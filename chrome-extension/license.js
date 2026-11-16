@@ -38,7 +38,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function loadTheme() {
   chrome.storage.local.get(['theme'], (result) => {
-    document.body.setAttribute('data-theme', result.theme || 'dark');
+    const theme = result.theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    document.body.setAttribute('data-theme', theme);
   });
 }
 
@@ -48,7 +50,8 @@ function updateUI() {
   
   // Update language toggle
   const langToggle = document.getElementById('langToggle');
-  langToggle.textContent = lang === 'nl' ? '🇳🇱' : '🇬🇧';
+  langToggle.textContent = lang === 'nl' ? 'NL' : 'EN';
+  document.documentElement.lang = lang;
   langToggle.title = lang === 'nl' ? 'Switch to English' : 'Wissel naar Nederlands';
   
   // Update all i18n elements

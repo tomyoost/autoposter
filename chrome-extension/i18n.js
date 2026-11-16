@@ -6,7 +6,7 @@ const translations = {
     tagline: 'Sneller verkopen op Vinted',
     
     // Intro
-    introText: 'Voeg eerst je foto\'s toe, ook van het merk- en maatlabel. De AI maakt titel, beschrijving, prijsvoorstel, categorie, merk, maat, staat en kleur voor je.',
+    introText: 'Voeg je foto\'s toe, ook van het merk- en maatlabel. De AI vult titel, beschrijving, prijs, categorie, merk, maat, staat en kleur voor je in.',
     
     // Sections
     productInfo: 'Productgegevens',
@@ -26,7 +26,7 @@ const translations = {
     tagsPlaceholder: 'nike, sneakers, vintage',
     descriptionLabel: 'Beschrijving',
     descriptionPlaceholder: 'Beschrijf je product...',
-    extraInfo: 'Extra Info',
+    extraInfo: 'Extra info',
     extraInfoPlaceholder: 'Maten, kleuren, defecten, etc.',
     
     // Categories
@@ -51,35 +51,42 @@ const translations = {
     condFair: 'Redelijk',
     
     // Buttons
-    generateAI: 'Genereer AI Beschrijving',
-    analyzePhoto: 'Analyseer foto\'s met AI',
+    generateAI: 'Beschrijving schrijven',
+    analyzePhoto: 'Analyseer foto\'s',
     useTemplate: 'Gebruik Template',
     copy: 'Kopieer',
-    open: 'Open',
-    clearForm: 'Wis Formulier',
+    open: 'Openen op Vinted',
+    clearForm: 'Wis formulier',
     settings: 'Instellingen',
     upgrade: 'Upgrade',
     unlimited: 'onbeperkt',
+    usageOf: '{used} van {limit} scans',
+    recognizedLabel: 'Van het label gelezen. Dit komt bij Plakken in de Vinted-vakjes.',
+    recBrand: 'Merk',
+    recSize: 'Maat',
+    recColor: 'Kleur',
+    recMaterial: 'Materiaal',
+    usageScans: 'scans',
     usageLimitReached: 'Limiet bereikt! Upgrade voor meer AI analyses.',
-    welcomeTitle: 'Welkom bij Autoposter!',
-    welcomeText: 'Leer in 3 stappen hoe je in seconden listings maakt.',
-    step1Title: 'Upload Foto\'s',
+    welcomeTitle: 'Welkom bij Autoposter',
+    welcomeText: 'Zo maak je een Vinted-advertentie in een paar seconden.',
+    step1Title: 'Foto\'s toevoegen',
     step1Desc: 'Sleep of klik om productfoto\'s toe te voegen',
-    step2Title: 'AI Analyseert',
+    step2Title: 'De AI vult alles in',
     step2Desc: 'De AI maakt titel, beschrijving en prijs en kiest categorie, merk, maat, staat en kleur',
     step3Title: 'Plakken op Vinted',
     step3Desc: 'Open Vinted en klik rechtsonder op \'Plakken\'',
-    getStarted: 'Aan de slag!',
+    getStarted: 'Aan de slag',
     skipTutorial: 'Overslaan',
     
     // Upload
-    uploadText: 'Klik of sleep foto\'s hier',
-    uploadLimit: 'Max 10 foto\'s (tot 15 MB per foto)',
-    aiHintNoPhoto: 'Upload een foto om AI analyse te activeren',
-    aiHintReady: 'Klik om je foto\'s (tot 6) te laten analyseren en het formulier in te vullen',
+    uploadText: 'Foto\'s toevoegen',
+    uploadLimit: 'Klik of sleep ze hierheen. Tot 10 foto\'s, de eerste wordt de omslag.',
+    aiHintNoPhoto: 'Voeg eerst een foto toe.',
+    aiHintReady: 'De AI bekijkt tot 6 foto\'s en vult alles hieronder in.',
     
     // Platform section
-    platformDescription: 'Open Vinted vanuit hier en klik daar rechtsonder op \'Plakken\'. Foto\'s, titel, beschrijving, prijs, categorie, merk, maat, staat en kleur worden dan ingevuld.',
+    platformDescription: 'Klik op Vinted rechtsonder op Plakken. Foto\'s, tekst, categorie, merk, maat, staat en kleur komen er dan in.',
     
     // Toasts
     copied: 'Gekopieerd',
@@ -87,7 +94,7 @@ const translations = {
     fillTitleFirst: 'Vul eerst een titel in',
     uploadPhotoFirst: 'Upload eerst een foto',
     photoAnalyzed: 'Foto geanalyseerd! Formulier ingevuld',
-    photoAnalyzedAndReordered: '📸 Geanalyseerd & foto\'s gerangschikt!',
+    photoAnalyzedAndReordered: 'Geanalyseerd en foto\'s op volgorde gezet',
     descriptionGenerated: 'Beschrijving gegenereerd!',
     onlyImages: 'Alleen afbeeldingen toegestaan',
     fileTooLarge: 'is te groot',
@@ -149,6 +156,8 @@ const translations = {
     
     // License page
     licenseTitle: 'Activeer Autoposter',
+    licenseTitle: 'Activeer Autoposter',
+    licenseKeyLabel: 'Licentiesleutel',
     licenseSubtitle: 'Vul je licentiesleutel in om Autoposter te activeren.',
     licenseActivate: 'Activeren',
     licenseKeyHint: 'Je sleutel staat op je Gumroad-bon, in de bevestigingsmail en in je Gumroad-bibliotheek.',
@@ -264,7 +273,7 @@ const translations = {
     tagline: 'Sell faster on Vinted',
     
     // Intro
-    introText: 'Add your photos first, including the brand and size label. The AI creates the title, description, price suggestion, category, brand, size, condition and colour for you.',
+    introText: 'Add your photos, including the brand and size label. The AI fills in the title, description, price, category, brand, size, condition and colour for you.',
     
     // Sections
     productInfo: 'Product details',
@@ -284,7 +293,7 @@ const translations = {
     tagsPlaceholder: 'nike, sneakers, vintage',
     descriptionLabel: 'Description',
     descriptionPlaceholder: 'Describe your product...',
-    extraInfo: 'Extra Info',
+    extraInfo: 'Extra info',
     extraInfoPlaceholder: 'Sizes, colors, defects, etc.',
     
     // Categories
@@ -309,35 +318,42 @@ const translations = {
     condFair: 'Fair',
     
     // Buttons
-    generateAI: 'Generate AI Description',
-    analyzePhoto: 'Analyse photos with AI',
+    generateAI: 'Write description',
+    analyzePhoto: 'Analyse photos',
     useTemplate: 'Use Template',
     copy: 'Copy',
-    open: 'Open',
-    clearForm: 'Clear Form',
+    open: 'Open on Vinted',
+    clearForm: 'Clear form',
     settings: 'Settings',
     upgrade: 'Upgrade',
     unlimited: 'unlimited',
+    usageOf: '{used} of {limit} scans',
+    recognizedLabel: 'Read from the label. Paste puts this into the Vinted fields.',
+    recBrand: 'Brand',
+    recSize: 'Size',
+    recColor: 'Colour',
+    recMaterial: 'Material',
+    usageScans: 'scans',
     usageLimitReached: 'Limit reached! Upgrade for more AI analyses.',
-    welcomeTitle: 'Welcome to Autoposter!',
-    welcomeText: 'Learn in 3 steps how to create listings in seconds.',
-    step1Title: 'Upload Photos',
+    welcomeTitle: 'Welcome to Autoposter',
+    welcomeText: 'This is how you make a Vinted listing in a few seconds.',
+    step1Title: 'Add photos',
     step1Desc: 'Drag or click to add product photos',
-    step2Title: 'AI Analyzes',
+    step2Title: 'The AI fills in everything',
     step2Desc: 'The AI writes title, description and price and picks category, brand, size, condition and colour',
     step3Title: 'Paste on Vinted',
     step3Desc: 'Open Vinted and click \'Paste\' at the bottom right',
-    getStarted: 'Get Started!',
+    getStarted: 'Get started',
     skipTutorial: 'Skip',
     
     // Upload
-    uploadText: 'Click or drag photos here',
-    uploadLimit: 'Max 10 photos (up to 15 MB each)',
-    aiHintNoPhoto: 'Upload a photo to enable AI analysis',
-    aiHintReady: 'Click to analyse your photos (up to 6) and fill in the form',
+    uploadText: 'Add photos',
+    uploadLimit: 'Click or drag them here. Up to 10 photos, the first one is the cover.',
+    aiHintNoPhoto: 'Add a photo first.',
+    aiHintReady: 'The AI looks at up to 6 photos and fills in everything below.',
     
     // Platform section
-    platformDescription: 'Open Vinted from here and click \'Paste\' at the bottom right. Photos, title, description, price, category, brand, size, condition and colour are filled in for you.',
+    platformDescription: 'On Vinted, click Paste at the bottom right. Photos, text, category, brand, size, condition and colour go straight in.',
     
     // Toasts
     copied: 'Copied',
@@ -345,7 +361,7 @@ const translations = {
     fillTitleFirst: 'Please fill in a title first',
     uploadPhotoFirst: 'Please upload a photo first',
     photoAnalyzed: 'Photo analyzed! Form filled',
-    photoAnalyzedAndReordered: '📸 Analyzed & photos arranged!',
+    photoAnalyzedAndReordered: 'Analysed and photos put in order',
     descriptionGenerated: 'Description generated!',
     onlyImages: 'Only images allowed',
     fileTooLarge: 'is too large',
@@ -407,6 +423,8 @@ const translations = {
     
     // License page
     licenseTitle: 'Activate Autoposter',
+    licenseTitle: 'Activate Autoposter',
+    licenseKeyLabel: 'License key',
     licenseSubtitle: 'Enter your license key to activate Autoposter.',
     licenseActivate: 'Activate',
     licenseKeyHint: 'Your key is on your Gumroad receipt, in the confirmation email and in your Gumroad library.',

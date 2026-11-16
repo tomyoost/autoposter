@@ -4,64 +4,64 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Autoposter - Settings</title>
-  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="settings.css">
 </head>
 <body>
-  <div class="container">
-    <header class="header">
-      <div class="header-row">
-        <button id="backBtn" class="btn-icon-only" title="Back">
-          ← 
-        </button>
-        <div class="logo">
-          <img src="icons/icon48.png" alt="Autoposter Logo">
-          <h1>Autoposter</h1>
-        </div>
-        <div class="spacer"></div>
-      </div>
-      <p class="tagline" data-i18n="settings">Settings</p>
-    </header>
+  <header class="settings-top">
+    <button id="backBtn" class="btn btn-text btn-small back-btn" title="Back">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg>
+      <span data-i18n="back">Terug</span>
+    </button>
+  </header>
 
-    <section class="form-section">
-      <h2 class="section-title"><span data-i18n="language">Language</span></h2>
-      <div class="language-selector">
-        <button class="lang-btn" data-lang="nl">
-          <span class="lang-flag">🇳🇱</span>
-          <span>Nederlands</span>
-        </button>
-        <button class="lang-btn" data-lang="en">
-          <span class="lang-flag">🇬🇧</span>
-          <span>English</span>
-        </button>
+  <main class="sheet settings-sheet">
+    <h1 class="settings-title" data-i18n="settings">Instellingen</h1>
+
+    <section class="settings-row">
+      <h2 class="section-title"><span data-i18n="language">Taal</span></h2>
+      <div class="language-selector" role="group">
+        <button class="lang-btn" data-lang="nl">Nederlands</button>
+        <button class="lang-btn" data-lang="en">English</button>
       </div>
     </section>
 
-    <section class="form-section">
-      <h2 class="section-title"><span data-i18n="templates">Templates</span></h2>
-      <p class="section-description" data-i18n="templatesDescription">
-        Create custom templates for each platform. Use placeholders like {{title}}, {{price}}, etc.
-      </p>
-      
+    <section class="settings-row" id="subscriptionSection">
+      <h2 class="section-title"><span data-i18n="subscription">Abonnement</span></h2>
+      <div class="subscription-info">
+        <p class="current-plan-row">
+          <span data-i18n="currentLicense">Huidig plan:</span>
+          <span class="plan-badge" id="currentPlanBadge">Free</span>
+        </p>
+        <p class="subscription-help" data-i18n="subscriptionHelp">Beheer je abonnement op Gumroad.</p>
+        <a target="_blank" rel="noopener" class="btn btn-small subscription-link" id="manageSubscriptionBtn">
+          <span data-i18n="manageSubscription">Abonnement beheren</span>
+          <svg class="external-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5h6.5V10M12.5 3.5L4 12"/></svg>
+        </a>
+      </div>
+    </section>
+
+    <section class="settings-row settings-row-wide">
+      <h2 class="section-title"><span data-i18n="templates">Eigen sjabloon</span></h2>
+      <p class="section-description" data-i18n="templatesDescription">Maak je eigen sjabloon voor de Vinted-beschrijving.</p>
       <div class="template-editor">
         <div class="placeholder-help">
-          <p class="help-title" data-i18n="availablePlaceholders">Available placeholders:</p>
+          <p class="help-title" data-i18n="availablePlaceholders">Klik op een code om hem in te voegen:</p>
           <div class="placeholder-grid">
-            <code>{{title}}</code>
-            <code>{{price}}</code>
-            <code>{{condition}}</code>
-            <code>{{category}}</code>
-            <code>{{tags}}</code>
-            <code>{{description}}</code>
-            <code>{{extraInfo}}</code>
-            <code>{{brand}}</code>
-            <code>{{size}}</code>
-            <code>{{color}}</code>
-            <code>{{material}}</code>
-          </div>
+          <code>{{title}}</code>
+          <code>{{price}}</code>
+          <code>{{condition}}</code>
+          <code>{{category}}</code>
+          <code>{{tags}}</code>
+          <code>{{description}}</code>
+          <code>{{extraInfo}}</code>
+          <code>{{brand}}</code>
+          <code>{{size}}</code>
+          <code>{{color}}</code>
+          <code>{{material}}</code>
         </div>
-        
-        <textarea 
+        </div>
+                <textarea 
           id="templateEditor" 
           class="template-textarea"
           rows="8"
@@ -78,41 +78,21 @@ Price: €{{price}}
 
 {{tags}}"
         ></textarea>
-        
         <div class="template-actions">
-          <button id="saveTemplateBtn" class="btn btn-secondary">
-            <span data-i18n="saveTemplate">Save Template</span>
+          <button id="saveTemplateBtn" class="btn btn-primary btn-small">
+            <span data-i18n="saveTemplate">Sjabloon opslaan</span>
           </button>
-          <button id="loadExampleBtn" class="btn btn-outline">
-            <span data-i18n="loadExample">Load Example</span>
+          <button id="loadExampleBtn" class="btn btn-small">
+            <span data-i18n="loadExample">Voorbeeld laden</span>
           </button>
-          <button id="resetTemplateBtn" class="btn btn-outline">
-            <span data-i18n="useAI">Use AI (no template)</span>
+          <button id="resetTemplateBtn" class="btn btn-text btn-small">
+            <span data-i18n="useAI">Terug naar AI-tekst</span>
           </button>
         </div>
       </div>
-    </section>
-
-    <!-- Subscription Management Section -->
-    <section class="form-section" id="subscriptionSection">
-      <h2 class="section-title"><span data-i18n="subscription">Subscription</span></h2>
-      <div class="subscription-info">
-        <div class="current-plan-row">
-          <span data-i18n="currentLicense">Current plan:</span>
-          <span class="plan-badge" id="currentPlanBadge">Free</span>
-        </div>
-        <p class="subscription-help" data-i18n="subscriptionHelp">Manage your subscription on Gumroad to upgrade, downgrade, or cancel.</p>
-        <a target="_blank" rel="noopener" class="btn btn-outline subscription-link" id="manageSubscriptionBtn">
-          <span data-i18n="manageSubscription">Manage Subscription</span>
-          <span class="external-icon">↗</span>
-        </a>
-      </div>
-    </section>
-
-
-    <section class="form-section">
-      <h2 class="section-title"><span data-i18n="placeholderInfo">Placeholder Info</span></h2>
-      <div class="info-table">
+      <details class="placeholder-details">
+        <summary><span data-i18n="placeholderInfo">Wat betekenen de codes?</span></summary>
+        <div class="info-table">
         <div class="info-row">
           <code>{{title}}</code>
           <span data-i18n="placeholderTitle">Product title</span>
@@ -158,10 +138,11 @@ Price: €{{price}}
           <span data-i18n="placeholderMaterial">Material (from AI analysis)</span>
         </div>
       </div>
+      </details>
     </section>
+  </main>
 
-    <div id="toast" class="toast"></div>
-  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="config.js"></script>
   <script src="i18n.js"></script>

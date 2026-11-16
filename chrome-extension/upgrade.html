@@ -4,25 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Abonnement - Autoposter for Vinted</title>
-  <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="upgrade.css">
 </head>
 <body>
   <div class="upgrade-container">
     <header class="upgrade-header">
-      <button class="back-btn" id="backBtn">
-        <span>←</span>
+      <button class="btn btn-text btn-small back-btn" id="backBtn">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5L5.5 8l4.5 4.5"/></svg>
         <span data-i18n="back">Terug</span>
       </button>
-      <button class="lang-toggle" id="langToggle" title="Switch language">🇳🇱</button>
-      <h1 data-i18n="upgradeTitle">Kies je plan</h1>
-      <p class="subtitle" data-i18n="upgradeSubtitle">Schaal mee met je verkoopvolume</p>
+      <button class="icon-btn lang-toggle" id="langToggle" title="Switch language">NL</button>
     </header>
 
-    <div class="current-plan" id="currentPlan">
-      <span class="current-label" data-i18n="currentPlan">Huidig plan:</span>
-      <span class="current-tier" id="currentTier">FREE</span>
-      <span class="current-usage" id="currentUsage">0/5</span>
+    <div class="upgrade-intro">
+      <h1 data-i18n="upgradeTitle">Kies je plan</h1>
+      <p class="subtitle" data-i18n="upgradeSubtitle">Schaal mee met je verkoopvolume</p>
+      <p class="current-plan" id="currentPlan">
+        <span class="current-label" data-i18n="currentPlan">Huidig plan</span>
+        <span class="current-tier" id="currentTier">Gratis</span>
+        <span class="current-usage num" id="currentUsage">0/5</span>
+      </p>
     </div>
 
     <div class="pricing-grid">
@@ -32,18 +34,16 @@
           <h2 data-i18n="tierFree">Gratis</h2>
           <p class="tier-desc" data-i18n="tierFreeDesc">Voor wie af en toe iets verkoopt</p>
           <div class="price">
-            <span class="amount">€0</span>
+            <span class="amount num" data-price="0">€0</span>
             <span class="period" data-i18n="perMonth">/maand</span>
           </div>
         </div>
         <ul class="features">
           <li class="feature-item">
-            <span class="feature-icon">✓</span>
-            <span>5 <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
+            <span><span class="num" data-num="5">5</span> <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
           </li>
           <li class="feature-item">
-            <span class="feature-icon">✓</span>
-            <span>25 <span data-i18n="featureTexts">AI-teksten per maand</span></span>
+            <span><span class="num" data-num="25">25</span> <span data-i18n="featureTexts">AI-teksten per maand</span></span>
           </li>
         </ul>
         <button class="btn btn-outline current-btn" disabled data-i18n="currentButton">Huidig plan</button>
@@ -56,18 +56,16 @@
           <h2 data-i18n="tierStarter">Starter</h2>
           <p class="tier-desc" data-i18n="tierStarterDesc">Voor regelmatige verkopers</p>
           <div class="price">
-            <span class="amount">€29.99</span>
+            <span class="amount num" data-price="29.99">€29.99</span>
             <span class="period" data-i18n="perMonth">/maand</span>
           </div>
         </div>
         <ul class="features">
           <li class="feature-item">
-            <span class="feature-icon">✓</span>
-            <span>200 <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
+            <span><span class="num" data-num="200">200</span> <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
           </li>
           <li class="feature-item">
-            <span class="feature-icon">✓</span>
-            <span>1000 <span data-i18n="featureTexts">AI-teksten per maand</span></span>
+            <span><span class="num" data-num="1000">1000</span> <span data-i18n="featureTexts">AI-teksten per maand</span></span>
           </li>
         </ul>
         <button class="btn btn-primary upgrade-btn" data-tier="starter">
@@ -81,18 +79,16 @@
           <h2 data-i18n="tierPro">Pro</h2>
           <p class="tier-desc" data-i18n="tierProDesc">Voor wie veel verkoopt</p>
           <div class="price">
-            <span class="amount">€59.99</span>
+            <span class="amount num" data-price="59.99">€59.99</span>
             <span class="period" data-i18n="perMonth">/maand</span>
           </div>
         </div>
         <ul class="features">
           <li class="feature-item">
-            <span class="feature-icon">✓</span>
-            <span>1000 <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
+            <span><span class="num" data-num="1000">1000</span> <span data-i18n="featureAnalyses">AI analyses per maand</span></span>
           </li>
           <li class="feature-item">
-            <span class="feature-icon">✓</span>
-            <span>5000 <span data-i18n="featureTexts">AI-teksten per maand</span></span>
+            <span><span class="num" data-num="5000">5000</span> <span data-i18n="featureTexts">AI-teksten per maand</span></span>
           </li>
         </ul>
         <button class="btn btn-secondary upgrade-btn" data-tier="pro">

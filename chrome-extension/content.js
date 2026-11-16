@@ -282,10 +282,13 @@ function loadLanguage() {
   });
 }
 
+const AP_BOLT_SVG = '<svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style="flex:none"><path d="M9.2 1.5L3.5 9h4l-1 5.5L12.5 7h-4l.7-5.5z" fill="currentColor"/></svg>';
+const AP_SPINNER = '<span class="autoposter-spinner" aria-hidden="true"></span>';
+
 function updateButtonText() {
   const btn = document.getElementById('autoposter-paste-btn');
   if (btn && !btn.disabled) {
-    btn.innerHTML = `🚀 ${t('paste')}`;
+    btn.innerHTML = `${AP_BOLT_SVG}<span>${t('paste')}</span>`;
   }
 }
 
@@ -298,35 +301,10 @@ function detectPlatform() {
 function createPasteButton() {
   const btn = document.createElement('button');
   btn.id = 'autoposter-paste-btn';
-  btn.innerHTML = `🚀 ${t('paste')}`;
+  btn.innerHTML = `${AP_BOLT_SVG}<span>${t('paste')}</span>`;
   btn.type = 'button';
-  btn.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 99999;
-    background: linear-gradient(135deg, #10b981, #059669);
-    color: white;
-    border: none;
-    padding: 14px 24px;
-    border-radius: 50px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-    transition: all 0.2s ease;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  `;
-  
-  btn.addEventListener('mouseenter', () => {
-    btn.style.transform = 'scale(1.05)';
-    btn.style.boxShadow = '0 6px 20px rgba(16, 185, 129, 0.5)';
-  });
-  
-  btn.addEventListener('mouseleave', () => {
-    btn.style.transform = 'scale(1)';
-    btn.style.boxShadow = '0 4px 15px rgba(16, 185, 129, 0.4)';
-  });
+  btn.title = 'Autoposter';
+  // Opmaak staat in content.css (marineblauw zoals het logo, zwevende knop rechtsonder)
   
   btn.addEventListener('click', handlePaste);
   
@@ -2409,7 +2387,7 @@ async function handlePaste() {
   }
   
   const pasteStartedAt = Date.now();
-  btn.innerHTML = `⏳ ${t('filling')}`;
+  btn.innerHTML = `${AP_SPINNER}<span>${t('filling')}</span>`;
   btn.disabled = true;
   btn.style.opacity = '0.7';
   
@@ -2570,7 +2548,7 @@ function buildFallbackText(data) {
 
 // Reset button state
 function resetButton(btn) {
-  btn.innerHTML = `🚀 ${t('paste')}`;
+  btn.innerHTML = `${AP_BOLT_SVG}<span>${t('paste')}</span>`;
   btn.disabled = false;
   btn.style.opacity = '1';
 }
@@ -2584,39 +2562,18 @@ function showNotification(message, type = 'info', duration = 4000) {
   const notification = document.createElement('div');
   notification.id = 'autoposter-notification';
   
-  const colors = {
-    success: { bg: '#10b981', icon: '✅' },
-    error: { bg: '#ef4444', icon: '❌' },
-    info: { bg: '#3b82f6', icon: 'ℹ️' },
-    warning: { bg: '#f59e0b', icon: '⚠️' }
-  };
-  
-  const config = colors[type] || colors.info;
-  
-  notification.style.cssText = `
-    position: fixed;
-    bottom: 90px;
-    right: 20px;
-    z-index: 99999;
-    background: ${config.bg};
-    color: white;
-    padding: 14px 24px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    animation: slideIn 0.3s ease;
-    max-width: 350px;
-    white-space: pre-line;
-  `;
-  
-  notification.textContent = message;
+  notification.className = `autoposter-note autoposter-note-${['success', 'error', 'warning'].includes(type) ? type : 'info'}`;
+  notification.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  // Geen emoji in meldingen; de kleur van het stipje zegt genoeg
+  notification.textContent = String(message)
+    .replace(/[\p{Extended_Pictographic}\uFE0F\u200D]/gu, '')
+    .replace(/^[ \t]+/gm, '')
+    .trim();
   document.body.appendChild(notification);
   
   setTimeout(() => {
-    notification.style.animation = 'slideOut 0.3s ease';
-    setTimeout(() => notification.remove(), 300);
+    notification.classList.add('is-leaving');
+    setTimeout(() => notification.remove(), 200);
   }, duration);
 }
 
@@ -2626,16 +2583,7 @@ function addStyles() {
   
   const style = document.createElement('style');
   style.id = 'autoposter-styles';
-  style.textContent = `
-    @keyframes slideIn {
-      from { transform: translateX(100px); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-    @keyframes slideOut {
-      from { transform: translateX(0); opacity: 1; }
-      to { transform: translateX(100px); opacity: 0; }
-    }
-  `;
+  style.textContent = '';
   document.head.appendChild(style);
 }
 

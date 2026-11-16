@@ -4,38 +4,38 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Autoposter - Activate</title>
+  <link rel="stylesheet" href="ui.css">
   <link rel="stylesheet" href="license.css">
 </head>
 <body>
-  <div class="license-container">
-    <!-- Language Toggle -->
-    <button class="lang-toggle" id="langToggle" title="Switch language">🇳🇱</button>
-
+  <main class="license-container">
     <div class="license-card">
-      <div class="logo">
-        <img src="icons/icon48.png" alt="Autoposter Logo">
-        <h1>Autoposter</h1>
+      <div class="license-top">
+        <div class="brand"><img src="icons/icon48.png" alt=""><span class="brand-name">Autoposter</span></div>
+        <button type="button" class="icon-btn lang-toggle" id="langToggle" title="Switch language">NL</button>
       </div>
 
-      <!-- Welcome page (opened in a tab right after installing) -->
+      <!-- Welkomstpagina (opent in een tab direct na het installeren) -->
       <div class="welcome" id="welcome" hidden>
-        <h2 data-i18n="welcomePageTitle">Welkom bij Autoposter</h2>
-        <p class="welcome-update" id="welcomeUpdate" data-i18n="welcomeUpdate" hidden></p>
+        <h1 data-i18n="welcomePageTitle">Welkom bij Autoposter</h1>
+        <p class="welcome-update notice notice-warning" id="welcomeUpdate" data-i18n="welcomeUpdate" hidden></p>
         <p class="welcome-intro" data-i18n="welcomePageIntro">In drie stappen klaar voor je eerste Vinted-advertentie:</p>
         <ol class="welcome-steps">
           <li>
             <span data-i18n="welcomeStepKey">Haal je gratis sleutel.</span>
-            <a class="btn-free" data-config-url="FREE_URL" target="_blank" rel="noopener" data-i18n="welcomeFreeBtn">Haal mijn gratis sleutel</a>
+            <a class="btn btn-free" data-config-url="FREE_URL" target="_blank" rel="noopener" data-i18n="welcomeFreeBtn">Haal mijn gratis sleutel</a>
           </li>
           <li data-i18n="welcomeStepPaste">Plak de sleutel hieronder en klik op Activeren.</li>
           <li data-i18n="welcomeStepPin">Zet Autoposter vast.</li>
         </ol>
       </div>
-      <p class="welcome-done" id="welcomeDone" data-i18n="welcomeDone" role="status" hidden></p>
+      <p class="welcome-done notice notice-positive" id="welcomeDone" data-i18n="welcomeDone" role="status" hidden></p>
 
+      <h1 class="license-title" data-i18n="licenseTitle">Activeer Autoposter</h1>
       <p class="subtitle" id="subtitle" data-i18n="licenseSubtitle">Vul je licentiesleutel in om Autoposter te activeren.</p>
 
       <div class="input-group" id="keyGroup">
+        <label for="licenseKey" data-i18n="licenseKeyLabel">Licentiesleutel</label>
         <input
           type="text"
           id="licenseKey"
@@ -47,7 +47,7 @@
         <div class="error-message" id="errorMessage" role="alert"></div>
       </div>
 
-      <button type="button" id="activateBtn" class="btn-activate">
+      <button type="button" id="activateBtn" class="btn btn-primary btn-block btn-activate">
         <span id="activateBtnText" data-i18n="licenseActivate">Activeren</span>
       </button>
 
@@ -65,7 +65,7 @@
         </p>
       </div>
     </div>
-  </div>
+  </main>
 
   <script src="config.js"></script>
   <script src="analytics.js"></script>

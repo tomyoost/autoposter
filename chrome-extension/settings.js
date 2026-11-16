@@ -41,6 +41,11 @@ const defaultTemplates = {
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
   await window.i18n.loadLanguage();
+  chrome.storage.local.get(['theme'], (result) => {
+    const theme = result.theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    document.body.dataset.theme = theme;
+  });
   loadTemplates();
   loadCurrentPlan();
   document.getElementById('manageSubscriptionBtn').href = AP_CONFIG.GUMROAD.LIBRARY_URL;
@@ -62,6 +67,7 @@ function setupEventListeners() {
       window.i18n.setLanguage(lang);
       updateLanguageButtons();
       translateUI();
+      loadCurrentPlan();
       showToast(lang === 'nl' ? 'Taal gewijzigd naar Nederlands' : 'Language changed to English', 'success');
     });
   });
@@ -129,19 +135,20 @@ function updateLanguageButtons() {
 
 function translateUI() {
   const lang = window.i18n.getCurrentLanguage();
+  document.documentElement.lang = lang;
   
   // Update data-i18n elements
   const i18nElements = {
     'language': lang === 'nl' ? 'Taal' : 'Language',
-    'templates': lang === 'nl' ? 'Templates' : 'Templates',
+    'templates': lang === 'nl' ? 'Eigen sjabloon' : 'Own template',
     'templatesDescription': lang === 'nl' 
       ? 'Maak je eigen sjabloon voor de Vinted-beschrijving. Regels met een lege placeholder worden automatisch weggehaald.'
       : 'Create your own template for the Vinted description. Lines with an empty placeholder are removed automatically.',
-    'availablePlaceholders': lang === 'nl' ? 'Beschikbare placeholders:' : 'Available placeholders:',
-    'saveTemplate': lang === 'nl' ? 'Template Opslaan' : 'Save Template',
-    'useAI': lang === 'nl' ? 'Gebruik AI (geen template)' : 'Use AI (no template)',
-    'loadExample': lang === 'nl' ? 'Laad Voorbeeld' : 'Load Example',
-    'placeholderInfo': lang === 'nl' ? 'Placeholder Info' : 'Placeholder Info',
+    'availablePlaceholders': lang === 'nl' ? 'Klik op een code om hem in te voegen:' : 'Click a code to insert it:',
+    'saveTemplate': lang === 'nl' ? 'Sjabloon opslaan' : 'Save template',
+    'useAI': lang === 'nl' ? 'Terug naar AI-tekst' : 'Back to AI text',
+    'loadExample': lang === 'nl' ? 'Voorbeeld laden' : 'Load example',
+    'placeholderInfo': lang === 'nl' ? 'Wat betekenen de codes?' : 'What do the codes mean?',
     'placeholderTitle': lang === 'nl' ? 'Producttitel' : 'Product title',
     'placeholderPrice': lang === 'nl' ? 'Prijs (alleen getal, zonder €)' : 'Price (number only, without €)',
     'placeholderCondition': lang === 'nl' ? 'Productconditie' : 'Product condition',
@@ -245,7 +252,8 @@ function loadCurrentPlan() {
     if (!badge) return;
     
     const tier = result.licenseData?.tier || 'free';
-    badge.textContent = tier.charAt(0).toUpperCase() + tier.slice(1);
+    const tierKey = { free: 'tierFree', starter: 'tierStarter', pro: 'tierPro' }[tier];
+    badge.textContent = tierKey ? window.i18n.t(tierKey) : tier.charAt(0).toUpperCase() + tier.slice(1);
     badge.className = `plan-badge ${tier}`;
   });
 }

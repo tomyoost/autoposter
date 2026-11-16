@@ -218,22 +218,20 @@ function updateUsageBanner() {
   
   const t = window.i18n?.t || (k => k);
   
+  usageFill.classList.remove('is-warn', 'is-full');
   if (licenseData.usageLimit === -1) {
-    usageText.textContent = `${licenseData.usageCount} AI analyses (${t('unlimited')})`;
+    usageText.textContent = `${licenseData.usageCount} ${t('usageScans')} (${t('unlimited')})`;
     usageFill.style.width = '100%';
-    usageFill.style.background = 'linear-gradient(90deg, #10b981, #059669)';
   } else {
-    usageText.textContent = `${licenseData.usageCount}/${licenseData.usageLimit} AI analyses`;
+    usageText.textContent = t('usageOf')
+      .replace('{used}', licenseData.usageCount)
+      .replace('{limit}', licenseData.usageLimit);
     const percentage = (licenseData.usageCount / licenseData.usageLimit) * 100;
     usageFill.style.width = `${Math.min(percentage, 100)}%`;
-    
-    // Color based on usage
     if (percentage >= 100) {
-      usageFill.style.background = '#ef4444';
+      usageFill.classList.add('is-full');
     } else if (percentage >= 80) {
-      usageFill.style.background = '#f59e0b';
-    } else {
-      usageFill.style.background = 'linear-gradient(90deg, #10b981, #059669)';
+      usageFill.classList.add('is-warn');
     }
   }
   
@@ -811,6 +809,9 @@ function setupEventListeners() {
   
   // Image upload
   uploadArea.addEventListener('click', () => imageInput.click());
+  uploadArea.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); imageInput.click(); }
+  });
   imageInput.addEventListener('change', handleImageSelect);
   
   // Drag and drop
@@ -920,7 +921,7 @@ function toggleLanguage() {
 
 function updateLanguageToggle() {
   const currentLang = window.i18n.getCurrentLanguage();
-  const label = currentLang === 'nl' ? '🇳🇱' : '🇬🇧';
+  const label = currentLang === 'nl' ? 'NL' : 'EN';
   const title = currentLang === 'nl' ? 'Switch to English' : 'Wissel naar Nederlands';
 
   const langToggle = document.getElementById('langToggle');
@@ -939,29 +940,37 @@ function updateLanguageToggle() {
 // Theme toggle
 function loadTheme() {
   chrome.storage.local.get(['theme'], (result) => {
-    const theme = result.theme || 'dark';
-    if (theme === 'light') {
-      document.body.classList.add('light-mode');
-    }
-    updateThemeToggle();
+    applyTheme(result.theme === 'dark' ? 'dark' : 'light');
   });
 }
 
-function toggleTheme() {
-  const isLight = document.body.classList.toggle('light-mode');
-  chrome.storage.local.set({ theme: isLight ? 'light' : 'dark' });
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  document.body.dataset.theme = theme;
+  document.body.classList.toggle('light-mode', theme === 'light');
   updateThemeToggle();
 }
 
+function toggleTheme() {
+  const next = document.body.dataset.theme === 'dark' ? 'light' : 'dark';
+  chrome.storage.local.set({ theme: next });
+  applyTheme(next);
+}
+
+const ICON_MOON = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M15.5 12.4A6 6 0 0 1 7.6 4.5a6 6 0 1 0 7.9 7.9z"/></svg>';
+const ICON_SUN = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="3.5"/><path d="M10 2.5v1.8M10 15.7v1.8M2.5 10h1.8M15.7 10h1.8M4.7 4.7l1.3 1.3M14 14l1.3 1.3M4.7 15.3L6 14M14 6l1.3-1.3"/></svg>';
+
 function updateThemeToggle() {
   const themeToggle = document.getElementById('themeToggle');
-  const isLight = document.body.classList.contains('light-mode');
-  themeToggle.textContent = isLight ? '🌙' : '☀️';
+  const isLight = document.body.dataset.theme !== 'dark';
+  themeToggle.innerHTML = isLight ? ICON_MOON : ICON_SUN;
   themeToggle.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+  themeToggle.setAttribute('aria-label', themeToggle.title);
 }
 
 function translateUI() {
   const t = window.i18n.t;
+  document.documentElement.lang = window.i18n.getCurrentLanguage();
   
   // Update all elements with data-i18n attribute
   document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -976,6 +985,7 @@ function translateUI() {
   });
   
   // Update AI hint based on state
+  renderRecognized();
   updateAnalyzeButton();
   updateTemplateButton();
 }
@@ -1133,6 +1143,7 @@ function resetAIFields() {
   
   // Reset analysis data
   analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '', quantity: 1, vinted: null };
+  renderRecognized();
   
   // Clear category picker
   clearCategorySelection();
@@ -1152,11 +1163,11 @@ function renderImagePreviews() {
       <div class="drag-handle" title="Drag to reorder">⠿</div>
       <img src="${img.data}" alt="${img.name}" data-index="${index}">
       <div class="image-actions">
-        <button type="button" class="btn-img-action btn-download" data-index="${index}" title="Download">
-          ⬇️
+        <button type="button" class="btn-img-action btn-download" data-index="${index}" title="Download" aria-label="Download">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2.5v8M4.5 7.5L8 11l3.5-3.5M3 13.5h10"/></svg>
         </button>
       </div>
-      <button type="button" class="remove-image" data-index="${index}">×</button>
+      <button type="button" class="remove-image" data-index="${index}" aria-label="Verwijder foto">×</button>
       <span class="image-index">${index + 1}</span>
     `;
     
@@ -1343,9 +1354,9 @@ async function handleAnalyzeImage(retryCount = 0) {
   analyzeImageBtn.classList.add('auto-analyzing');
   
   if (retryCount > 0) {
-    analyzeImageBtn.innerHTML = `<span class="btn-icon">🔄</span> ${t('analyzing')}`;
+    analyzeImageBtn.textContent = t('analyzing');
   } else {
-    analyzeImageBtn.innerHTML = `<span class="btn-icon">🔍</span> ${t('analyzing')}`;
+    analyzeImageBtn.textContent = t('analyzing');
   }
 
   try {
@@ -1580,6 +1591,38 @@ function autoReorderPhotos(photoOrder) {
   return true;
 }
 
+// "Van het label gelezen": wat de AI herkende en wat bij Plakken in de aparte Vinted-vakjes komt.
+// Een leeg vakje toont een streepje: de AI gokt niet als iets niet op de foto's staat.
+function renderRecognized() {
+  const box = document.getElementById('recognized');
+  const list = document.getElementById('recognizedList');
+  if (!box || !list) return;
+  const t = window.i18n?.t || (k => k);
+  const fields = [
+    ['recBrand', analysisData.brand],
+    ['recSize', analysisData.size || analysisData.vinted?.sizeLabel],
+    ['recColor', analysisData.color],
+    ['recMaterial', analysisData.material],
+  ];
+  const hasAny = fields.some(([, value]) => value && String(value).trim());
+  box.hidden = !hasAny;
+  list.textContent = '';
+  if (!hasAny) return;
+  for (const [key, value] of fields) {
+    const cell = document.createElement('div');
+    cell.className = 'recognized-cell';
+    const dt = document.createElement('dt');
+    dt.textContent = t(key);
+    const dd = document.createElement('dd');
+    const text = value && String(value).trim();
+    dd.textContent = text || '–';
+    if (!text) dd.className = 'is-empty';
+    dd.title = text || '';
+    cell.append(dt, dd);
+    list.append(cell);
+  }
+}
+
 function applyAnalysisResults(analysis) {
   const lang = window.i18n.getCurrentLanguage();
   
@@ -1750,6 +1793,7 @@ function applyAnalysisResults(analysis) {
   if (analysis.size) analysisData.size = analysis.size;
   if (analysis.color) analysisData.color = analysis.color;
   if (analysis.material) analysisData.material = analysis.material;
+  renderRecognized();
   
   // Handle quantity - update the quantity field
   if (analysis.quantity && analysis.quantity >= 1) {
@@ -1978,7 +2022,7 @@ async function handleGenerateAI() {
 
   generateAIBtn.disabled = true;
   generateAIBtn.classList.add('loading');
-  generateAIBtn.innerHTML = `<span class="btn-icon">...</span> ${t('generating')}`;
+  generateAIBtn.textContent = t('generating');
 
   try {
     const { licenseKey: storedKeyGen } = await chrome.storage.local.get(['licenseKey']);
@@ -2272,6 +2316,7 @@ function loadSavedData() {
     // Load analysis data
     if (result.analysisData) {
       analysisData = result.analysisData;
+      renderRecognized();
       
       // Restore category path display
       if (analysisData.categoryPath) {
@@ -2303,6 +2348,7 @@ function clearForm() {
   document.getElementById('listingForm').reset();
   uploadedImages = [];
   analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '', quantity: 1, vinted: null };
+  renderRecognized();
   imagePreviews.innerHTML = '';
   formWasCleared = false;
   
@@ -2367,7 +2413,10 @@ function initCategoryPicker() {
   renderCategoryList(VINTED_CATEGORIES);
   closeCategoryDropdown();
 
-  // Toggle dropdown on click
+  // Toggle dropdown on click (and with Enter or Space)
+  triggerEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCategoryDropdown(); }
+  });
   triggerEl.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
