@@ -35,9 +35,15 @@ export async function callGemini(
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return { ok: false, status: 500, code: "NO_API_KEY", detail: "GEMINI_API_KEY not configured" };
 
+  // Denkstand per doel: foto-analyse "medium", categorie en beschrijving "low" (eenvoudig, sneller en goedkoper)
+  const EFFORT_SETTING: Record<GeminiPurpose, [string, string]> = {
+    analyze: ["ai_reasoning_effort", "medium"],
+    category: ["ai_reasoning_effort_category", "low"],
+    text: ["ai_reasoning_effort_text", "low"],
+  };
   const effort = opts.effort !== undefined
     ? opts.effort
-    : await getSetting<string | null>(purpose === "category" ? "ai_reasoning_effort_category" : "ai_reasoning_effort", purpose === "category" ? "low" : "medium");
+    : await getSetting<string | null>(EFFORT_SETTING[purpose][0], EFFORT_SETTING[purpose][1]);
   let lastError: GeminiResult = { ok: false, status: 500, code: "AI_ERROR", detail: "no model tried" };
   let sawRateLimit = false;
 
@@ -73,8 +79,12 @@ export async function callGemini(
       }
 
       if (res.ok) {
-        console.log(`Gemini ${model} ok in ${Date.now() - started} ms`);
-        return { ok: true, data: await res.json(), model };
+        const data = await res.json();
+        // Tokengebruik per aanroep (voor de kosten per scan); geen inhoud
+        const u = data?.usage ?? {};
+        const reasoning = u?.completion_tokens_details?.reasoning_tokens ?? null;
+        console.log(`Gemini ${model} ok in ${Date.now() - started} ms | ${purpose} | in ${u.prompt_tokens ?? "?"} uit ${u.completion_tokens ?? "?"} denk ${reasoning ?? "?"} totaal ${u.total_tokens ?? "?"}`);
+        return { ok: true, data, model };
       }
 
       const text = (await res.text()).slice(0, 500);
