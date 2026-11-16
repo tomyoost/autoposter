@@ -156,7 +156,6 @@ const translations = {
     
     // License page
     licenseTitle: 'Activeer Autoposter',
-    licenseTitle: 'Activeer Autoposter',
     licenseKeyLabel: 'Licentiesleutel',
     licenseSubtitle: 'Vul je licentiesleutel in om Autoposter te activeren.',
     licenseActivate: 'Activeren',
@@ -422,7 +421,6 @@ const translations = {
     catSports: 'Sports',
     
     // License page
-    licenseTitle: 'Activate Autoposter',
     licenseTitle: 'Activate Autoposter',
     licenseKeyLabel: 'License key',
     licenseSubtitle: 'Enter your license key to activate Autoposter.',
