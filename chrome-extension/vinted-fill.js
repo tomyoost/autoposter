@@ -142,31 +142,56 @@
   // Velden invullen
   // ---------------------------------------------------------------------------------------
 
+  // Waarom de laatste categoriekeuze mislukte (gaat mee in de meting na het plakken)
+  let lastCategoryReason = '';
+
+  /**
+   * Kiest de categorie. Vlak na het uploaden van de foto's is Vinted zelf nog bezig (het zoekt een categorievoorstel
+   * en tekent het vak opnieuw); een poging kan dan mislukken. Daarom tot 3 pogingen, elke keer met verse elementen.
+   */
   async function selectCategory(catalogId) {
-    if (!Number.isInteger(catalogId)) return false;
+    lastCategoryReason = '';
+    if (!Number.isInteger(catalogId)) { lastCategoryReason = 'no-id'; return false; }
     const catalog = await refreshCatalog();
     const node = catalog && catalog.nodes.find((n) => n[0] === catalogId);
-    if (!node) return false; // deze categorie bestaat niet in de indeling van deze gebruiker
+    if (!node) { lastCategoryReason = 'not-in-tree'; return false; } // bestaat niet in de indeling van deze gebruiker
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      if (await trySelectCategory(node)) {
+        lastCategoryReason = attempt > 1 ? `ok-attempt-${attempt}` : '';
+        return true;
+      }
+      await sleep(1200);
+    }
+    return false;
+  }
 
+  async function trySelectCategory(node) {
+    const [catalogId, , title] = node;
+    const current = () => byTestId('catalog-select-dropdown-input');
     const opened = await openDropdown('catalog-select-dropdown-input', 'catalog-select-dropdown-content');
-    if (!opened) return false;
+    if (!opened) { lastCategoryReason = 'not-open'; return false; }
     const search = [...opened.content.querySelectorAll('input')].find((i) => i.type === 'text' || i.type === 'search');
     if (!search) {
-      closeDropdown(opened.input);
+      lastCategoryReason = 'no-search';
+      closeDropdown(current() || opened.input);
       return false;
     }
     search.focus();
-    setInputValue(search, node[2]);
+    setInputValue(search, title);
     const radio = await waitFor(() => document.getElementById(`catalog-search-${catalogId}-radio`), 5000);
     if (!radio) {
+      lastCategoryReason = 'no-result';
       setInputValue(search, '');
-      closeDropdown(opened.input);
+      closeDropdown(current() || opened.input);
       return false;
     }
     clickRow(radio);
-    // Only a success if exactly this category is in the field (not Vinted's own suggestion from the title)
-    const ok = await waitFor(() => !byTestId('catalog-select-dropdown-content') && norm(fieldValue(opened.input)) === norm(node[2]), 3000);
-    if (!ok && byTestId('catalog-select-dropdown-content')) closeDropdown(opened.input);
+    // Alleen gelukt als precies deze categorie in het vak staat (niet Vinted's eigen voorstel uit de titel)
+    const ok = await waitFor(() => !byTestId('catalog-select-dropdown-content') && norm(fieldValue(current())) === norm(title), 3000);
+    if (!ok) {
+      lastCategoryReason = 'not-applied';
+      if (byTestId('catalog-select-dropdown-content')) closeDropdown(current() || opened.input);
+    }
     return !!ok;
   }
 
@@ -207,10 +232,10 @@
         if (!custom) break;
         clickRow(custom); // "Gebruik ... als merk"
       }
-      if (await waitFor(() => fieldValue(opened.input), 1500)) break;
+      if (await waitFor(() => fieldValue(byTestId(opened.input.getAttribute('data-testid')) || opened.input), 1500)) break;
       await sleep(600); // lijst was nog in beweging: nog één keer
     }
-    const ok = !!fieldValue(opened.input);
+    const ok = !!fieldValue(byTestId(opened.input.getAttribute('data-testid')) || opened.input);
     if (byTestId('brand-select-dropdown-content')) closeDropdown(opened.input);
     return ok;
   }
@@ -233,7 +258,7 @@
       const hit = options.find((el) => sizeTokens(el.innerText).has(want));
       if (hit) {
         realClick(hit);
-        const ok = await waitFor(() => fieldValue(opened.input), 2000);
+        const ok = await waitFor(() => fieldValue(byTestId(opened.input.getAttribute('data-testid')) || opened.input), 2000);
         if (byTestId('category-size-single-grid-content')) closeDropdown(opened.input);
         return !!ok;
       }
@@ -252,7 +277,7 @@
       return false;
     }
     realClick(cell);
-    const ok = await waitFor(() => fieldValue(opened.input), 2000);
+    const ok = await waitFor(() => fieldValue(byTestId(opened.input.getAttribute('data-testid')) || opened.input), 2000);
     if (byTestId('category-condition-single-list-content')) closeDropdown(opened.input);
     return !!ok;
   }
@@ -276,7 +301,7 @@
     }
     closeDropdown(opened.input);
     await sleep(250);
-    return picked > 0 && !!fieldValue(opened.input);
+    return picked > 0 && !!fieldValue(byTestId(opened.input.getAttribute('data-testid')) || opened.input);
   }
 
   /**
@@ -320,7 +345,10 @@
     return !!fieldValue(byTestId('catalog-select-dropdown-input'));
   }
 
-  window.AutoposterVinted = { refreshCatalog, fillVintedFields, selectCategory, hasCategory };
+  window.AutoposterVinted = {
+    refreshCatalog, fillVintedFields, selectCategory, hasCategory,
+    categoryReason: () => lastCategoryReason,
+  };
 
   // Boom alvast ophalen, zodat de volgende analyse in de popup de eigen lijst van de gebruiker gebruikt.
   setTimeout(() => { refreshCatalog(); }, 2500);

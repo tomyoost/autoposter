@@ -2507,6 +2507,8 @@ async function handlePaste() {
           filled: successfulFields.length,
           failed: failedFields.length,
           failedFields: results.filter(r => !r.success).map(r => r.key || 'other').slice(0, 10),
+          categoryReason: (window.AutoposterVinted && typeof window.AutoposterVinted.categoryReason === 'function')
+            ? String(window.AutoposterVinted.categoryReason() || '').slice(0, 20) : '',
           photos: data.savedImages?.length || 0,
           seconds: Math.round((Date.now() - pasteStartedAt) / 1000)
         }
