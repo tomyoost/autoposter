@@ -3,9 +3,9 @@
 
 export const PRODUCT_NAME = "Autoposter for Vinted";
 
-// Chrome Web Store listing. Leave empty until the listing is live: the site then shows
-// "Binnenkort in de Chrome Web Store" instead of an install button.
-export const CHROME_WEB_STORE_URL = "";
+// Chrome Web Store listing (live since 16-11-2026, version 1.1.0 approved).
+// Empty would show "Binnenkort in de Chrome Web Store" instead of an install button.
+export const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/detail/lddffkfkelbplbdepokedodeaggpbeff";
 
 export const GUMROAD_BUY_URL = "https://tomyoost.gumroad.com/l/autoposter-starter";
 export const GUMROAD_FREE_URL = "https://tomyoost.gumroad.com/l/autoposter-gratis";
