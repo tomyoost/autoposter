@@ -79,7 +79,7 @@ const translations = {
     aiHintReady: 'Klik om de eerste foto te analyseren en het formulier automatisch in te vullen',
     
     // Platform section
-    platformDescription: 'Open Vinted vanuit hier en klik daar rechtsonder op \'Plakken\'. Foto\'s, titel, beschrijving, prijs en categorie worden dan ingevuld.',
+    platformDescription: 'Open Vinted vanuit hier en klik daar rechtsonder op \'Plakken\'. Foto\'s, titel, beschrijving, prijs, categorie, merk, maat, staat en kleur worden dan ingevuld.',
     
     // Toasts
     copied: 'Gekopieerd',
@@ -327,7 +327,7 @@ const translations = {
     aiHintReady: 'Click to analyze the first photo and auto-fill the form',
     
     // Platform section
-    platformDescription: 'Open Vinted from here and click \'Paste\' at the bottom right. Photos, title, description, price and category are filled in for you.',
+    platformDescription: 'Open Vinted from here and click \'Paste\' at the bottom right. Photos, title, description, price, category, brand, size, condition and colour are filled in for you.',
     
     // Toasts
     copied: 'Copied',

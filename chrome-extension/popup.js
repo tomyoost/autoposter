@@ -5,7 +5,7 @@ const MAX_IMAGES = 10;
 const MAX_IMAGE_SIZE = 15 * 1024 * 1024; // 15 MB per original photo; we compress before storing
 const IMAGE_MAX_SIDE = 1600; // px, longest side of a stored photo
 const IMAGE_JPEG_QUALITY = 0.85;
-const MAX_IMAGES_FOR_AI = 3; // the server only sends the first 3 photos to the AI
+const MAX_IMAGES_FOR_AI = 6; // the server sends at most 6 photos to the AI
 const FORM_SAVE_DELAY = 400; // ms debounce for saving text fields
 const ANALYZE_TIMEOUT = 60000; // ms; the server stops AI work after about 40 s and answers well within this
 
@@ -15,7 +15,10 @@ const AI_RETRYABLE_CODES = ['AI_ERROR', 'AI_NO_CONTENT', 'AI_PARSE_FAIL', 'AI_RA
 const IMAGE_ERROR_CODES = ['NO_IMAGE', 'INVALID_IMAGE', 'IMAGE_TOO_LARGE', 'INVALID_FORMAT', 'TOO_MANY_IMAGES', 'PAYLOAD_TOO_LARGE'];
 
 // What "Plakken" on Vinted reads (besides savedImages). Must always describe the listing in the form.
-const PASTE_PAYLOAD_KEYS = ['lastFormattedText', 'lastTitle', 'lastPrice', 'lastPlatform', 'lastCategory', 'lastCategoryPath', 'lastListingId'];
+const PASTE_PAYLOAD_KEYS = ['lastFormattedText', 'lastTitle', 'lastPrice', 'lastPlatform', 'lastCategory', 'lastCategoryPath', 'lastVinted', 'lastListingId'];
+
+// Popup condition values → Vinted status ids (the same in every country)
+const VINTED_STATUS_IDS = { nieuw: 6, nieuw_zonder: 1, zeer_goed: 2, goed: 3, redelijk: 4 };
 
 // License data (display only; the server decides what is allowed)
 let licenseData = {
@@ -38,7 +41,8 @@ let analysisData = {
   color: '',
   material: '',
   categoryPath: '', // Store full category path from AI
-  quantity: 1 // Default quantity
+  quantity: 1, // Default quantity
+  vinted: null // Vinted ids from the AI (category, condition, colours, ...) for "Plakken"
 };
 
 // Track if template was already applied (to prevent double application)
@@ -1122,7 +1126,7 @@ function resetAIFields() {
   document.getElementById('quantity').value = '1';
   
   // Reset analysis data
-  analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '', quantity: 1 };
+  analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '', quantity: 1, vinted: null };
   
   // Clear category picker
   clearCategorySelection();
@@ -1372,8 +1376,13 @@ async function handleAnalyzeImage(retryCount = 0) {
       return;
     }
     
-    // Photos are already compressed when added; the server only uses the first 3
+    // Photos are already compressed when added; the server uses at most 6
     const imagesToSend = uploadedImages.slice(0, MAX_IMAGES_FOR_AI).map(img => img.data);
+    // The user's own Vinted category list (saved by the content script on Vinted), so the AI picks from exactly that list
+    const { vintedCatalog } = await chrome.storage.local.get(['vintedCatalog']);
+    const catalog = vintedCatalog && vintedCatalog.v === 1 && Array.isArray(vintedCatalog.nodes)
+      ? { v: 1, lang: vintedCatalog.lang || '', nodes: vintedCatalog.nodes }
+      : undefined;
     
     // Create AbortController for timeout
     const controller = new AbortController();
@@ -1389,7 +1398,8 @@ async function handleAnalyzeImage(retryCount = 0) {
         },
         body: JSON.stringify({
           images: imagesToSend,
-          language: window.i18n.getCurrentLanguage()
+          language: window.i18n.getCurrentLanguage(),
+          catalog
         }),
         signal: controller.signal
       });
@@ -1677,9 +1687,21 @@ function applyAnalysisResults(analysis) {
     }
   }
 
+  // Vinted fields (category id, brand, size, condition, colours, material) for "Plakken"
+  analysisData.vinted = analysis.vinted && typeof analysis.vinted === 'object' ? analysis.vinted : null;
+
   // Category - use the new category picker
   let detectedCategoryValue = '';
-  if (analysis.category) {
+  if (analysisData.vinted && Array.isArray(analysisData.vinted.catalogPath) && analysisData.vinted.catalogPath.length) {
+    // Exact Vinted category in the user's own language
+    const categoryPath = analysisData.vinted.catalogPath.join(' > ');
+    analysisData.categoryPath = categoryPath;
+    setCategoryFromPath(categoryPath);
+    detectedCategoryValue = analysisData.vinted.catalogPath.join('_').toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_');
+    const pickerEl = document.getElementById('categoryPicker');
+    if (pickerEl) highlightField(pickerEl);
+    fieldsUpdated.push('categorie');
+  } else if (analysis.category) {
     // Build category path from AI response
     const sub = (analysis.subcategory || '').trim();
     const main = analysis.category.trim();
@@ -2145,7 +2167,8 @@ function buildPastePayload(formData, formattedText) {
     lastPrice: formData.price,
     lastPlatform: 'vinted',
     lastCategory: getCategoryText(formData.category),
-    lastCategoryPath: formData.categoryPath || analysisData.categoryPath || ''
+    lastCategoryPath: formData.categoryPath || analysisData.categoryPath || '',
+    lastVinted: buildVintedPayload(formData)
   };
   if (formattedText) {
     payload.lastFormattedText = formattedText;
@@ -2154,6 +2177,22 @@ function buildPastePayload(formData, formattedText) {
   }
   // else: keep the text already stored for THIS listing (e.g. the AI-formatted text from "Kopieer")
   return payload;
+}
+
+// What the content script fills in on Vinted besides title, description and price.
+// The condition comes from the popup (the user may have changed it), the rest from the AI analysis.
+function buildVintedPayload(formData) {
+  const v = analysisData.vinted;
+  const statusId = VINTED_STATUS_IDS[formData.condition] || (v && v.statusId) || null;
+  if (!v && !statusId) return null;
+  return {
+    catalogId: v && Number.isInteger(v.catalogId) ? v.catalogId : null,
+    brand: (v && v.brand) || '',
+    sizeCandidates: (v && Array.isArray(v.sizeCandidates)) ? v.sizeCandidates : [],
+    statusId,
+    colorIds: (v && Array.isArray(v.colorIds)) ? v.colorIds : [],
+    materialIds: (v && Array.isArray(v.materialIds)) ? v.materialIds : []
+  };
 }
 
 // Write the paste payload for the listing that is in the form right now (Kopieer and Open Vinted)
@@ -2259,7 +2298,7 @@ function clearForm() {
   formSaveTimer = null;
   document.getElementById('listingForm').reset();
   uploadedImages = [];
-  analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '', quantity: 1 };
+  analysisData = { brand: '', size: '', color: '', material: '', categoryPath: '', quantity: 1, vinted: null };
   imagePreviews.innerHTML = '';
   formWasCleared = false;
   
@@ -2568,6 +2607,8 @@ function selectCategory(key, displayLabel) {
   
   // Store in analysis data - use keys for matching with Vinted
   analysisData.categoryPath = fullPathKeys.join(' > ');
+  // The user picked a category by hand: paste that one, not the AI's Vinted category
+  if (analysisData.vinted) analysisData.vinted = { ...analysisData.vinted, catalogId: null };
   
   // Show selected display - use translated labels
   const selectedEl = document.getElementById('categorySelected');
@@ -2599,6 +2640,7 @@ function clearCategorySelection() {
   }
   
   analysisData.categoryPath = '';
+  if (analysisData.vinted) analysisData.vinted = { ...analysisData.vinted, catalogId: null };
   
   const selectedEl = document.getElementById('categorySelected');
   if (selectedEl) {

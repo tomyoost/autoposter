@@ -4,7 +4,7 @@
     "description": "Naam van de extensie in Chrome en de Chrome Web Store."
   },
   "extDescription": {
-    "message": "AI leest je foto's en vult titel, beschrijving en categorie voor je in op Vinted. De prijs bepaal je zelf.",
+    "message": "AI leest je foto's en vult titel, beschrijving, categorie, merk, maat, staat en kleur voor je in op Vinted.",
     "description": "Korte beschrijving (max. 132 tekens)."
   }
 }

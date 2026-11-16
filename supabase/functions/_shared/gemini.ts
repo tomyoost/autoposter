@@ -3,15 +3,21 @@ import { getSetting } from "./db.ts";
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 
-export type GeminiPurpose = "analyze" | "text";
+export type GeminiPurpose = "analyze" | "text" | "category";
 
 export type GeminiResult =
   | { ok: true; data: any; model: string }
   | { ok: false; status: number; code: "NO_API_KEY" | "AI_RATE_LIMIT" | "AI_NO_CREDITS" | "AI_ERROR"; detail: string };
 
 /** Kiest het model uit app_settings: ai_model_analyze / ai_model_text, met ai_model_fallback als reserve. */
+const MODEL_SETTING: Record<GeminiPurpose, string> = {
+  analyze: "ai_model_analyze",
+  text: "ai_model_text",
+  category: "ai_model_category",
+};
+
 async function modelsFor(purpose: GeminiPurpose): Promise<string[]> {
-  const primary = await getSetting<string>(purpose === "analyze" ? "ai_model_analyze" : "ai_model_text", "gemini-3.5-flash-lite");
+  const primary = await getSetting<string>(MODEL_SETTING[purpose], "gemini-3.5-flash-lite");
   const fallback = await getSetting<string>("ai_model_fallback", "gemini-3.1-flash-lite");
   return [...new Set([primary, fallback].filter((m) => typeof m === "string" && m.length > 0))];
 }
@@ -23,16 +29,19 @@ async function modelsFor(purpose: GeminiPurpose): Promise<string[]> {
 export async function callGemini(
   purpose: GeminiPurpose,
   payload: Record<string, unknown>,
-  opts: { deadline?: number } = {},
+  opts: { deadline?: number; models?: string[]; effort?: string | null } = {},
 ): Promise<GeminiResult> {
   const deadline = opts.deadline ?? Date.now() + 40_000;
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return { ok: false, status: 500, code: "NO_API_KEY", detail: "GEMINI_API_KEY not configured" };
 
-  const effort = await getSetting<string | null>("ai_reasoning_effort", "medium");
+  const effort = opts.effort !== undefined
+    ? opts.effort
+    : await getSetting<string | null>(purpose === "category" ? "ai_reasoning_effort_category" : "ai_reasoning_effort", purpose === "category" ? "low" : "medium");
   let lastError: GeminiResult = { ok: false, status: 500, code: "AI_ERROR", detail: "no model tried" };
 
-  for (const model of await modelsFor(purpose)) {
+  const models = opts.models && opts.models.length > 0 ? opts.models : await modelsFor(purpose);
+  for (const model of models) {
     let withEffort = typeof effort === "string" && effort.length > 0;
     for (let attempt = 0; attempt < 2; attempt++) {
       const remaining = deadline - Date.now();
@@ -49,7 +58,7 @@ export async function callGemini(
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(Math.min(25_000, remaining - 500)),
+          signal: AbortSignal.timeout(Math.min(35_000, remaining - 500)),
         });
       } catch (e) {
         const detail = e instanceof Error ? e.message : String(e);

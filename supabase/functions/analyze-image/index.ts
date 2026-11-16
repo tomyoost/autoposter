@@ -9,274 +9,178 @@ import {
   resolveLicense,
   usageView,
 } from "../_shared/license.ts";
+import {
+  type CatalogTree,
+  clientCatalog,
+  COLOR_NAMES,
+  COLORS,
+  type ConditionKey,
+  CONDITIONS,
+  isLeaf,
+  leafLines,
+  lexicalBestLeaf,
+  MATERIALS,
+  pathOf,
+  snapshotCatalog,
+  topLevelOverview,
+} from "../_shared/vinted.ts";
 
-interface AnalysisResult {
-  category: string;
-  subcategory: string;
-  brand: string;
-  size: string;
-  color: string;
-  material: string;
-  condition: string;
-  quantity: number;
-  suggestedTitle: string;
-  suggestedTags: string[];
+// ---------------------------------------------------------------------------------------------
+// Stap 1: foto's bekijken (beeldmodel). Stap 2: exacte Vinted-categorie kiezen uit de echte lijst (tekstmodel).
+// ---------------------------------------------------------------------------------------------
+
+interface Stage1 {
+  itemType?: string;
+  targetGroup?: string;
+  topLevelIds?: Array<string | number>;
+  categoryGuess?: string;
+  brand?: string;
+  brandEvidence?: string;
+  sizeLabel?: string;
+  sizeCandidates?: string[];
+  colorCodes?: string[];
+  materials?: string[];
+  condition?: string;
+  conditionReason?: string;
+  suggestedTitle?: string;
+  suggestedTags?: string[];
   suggestedPrice?: number;
+  quantity?: number;
+  photoOrder?: Array<{ imageIndex: number; type: string; score: number }>;
 }
 
-// Tool schema for structured output
-const analysisToolSchema = {
+const TARGET_GROUPS = ["women", "men", "unisex_adult", "girls", "boys", "baby", "kids_unisex", "not_fashion"];
+const CONDITION_KEYS = Object.keys(CONDITIONS) as ConditionKey[];
+const COLOR_CODES = Object.keys(COLORS);
+const MATERIAL_NAMES = Object.keys(MATERIALS);
+
+const stage1Tool = {
   type: "function",
   function: {
-    name: "analyze_product",
-    description: "Analyze product image and return structured data based on visible text and labels",
+    name: "fill_vinted_listing",
+    description: "Fill in the Vinted listing form for the item in the photos",
     parameters: {
       type: "object",
       properties: {
-        category: {
-          type: "string",
-          enum: ["Women", "Men", "Kids", "Home", "Electronics", "Entertainment", "Hobbies & Collectables", "Sports"],
-          description: "Main Vinted category (top level only). For clothing and shoes choose Women, Men or Kids based on cut, size and style."
-        },
-        subcategory: { 
-          type: "string", 
-          description: "Full subcategory path using ' > ' separator. MUST include 'Clothing' for clothing or 'Shoes' for footwear. Example: 'Clothing > Dresses > Long dresses'" 
-        },
-        brand: { 
-          type: "string", 
-          description: "Brand name read from packaging, label, or hang tag. The largest text on packaging is usually the brand." 
-        },
-        size: { 
-          type: "string", 
-          description: "Size read from labels. Include ALL visible formats: AU6/US2/EU36, S/M/L/XL, etc." 
-        },
-        color: { type: "string", description: "Main colors visible" },
-        material: { type: "string", description: "Material if visible on labels" },
-        condition: { 
-          type: "string", 
-          enum: ["new", "very_good", "good", "fair"],
-          description: "new = plastic packaging OR hang tags attached. very_good = no tags but looks unused. good = minor wear. fair = visible damage." 
-        },
-        suggestedTitle: { 
-          type: "string", 
-          description: "Title max 40 chars. Format: [Brand] [Exact Product Name from label] [Size]. NEVER invent names - read literal text from stickers/labels." 
-        },
-        suggestedTags: { 
-          type: "array", 
-          items: { type: "string" },
-          description: "5-8 relevant search tags" 
-        },
-        suggestedPrice: { 
-          type: "number", 
-          description: "Realistic resale price in EUR" 
-        },
-        quantity: {
-          type: "number",
-          description: "Number of identical items visible in the photo. Count visible boxes, packages, or items. Default is 1 if only one item is shown."
-        },
+        itemType: { type: "string", description: "Precise English noun phrase for the item for sale, e.g. \"men's straight-leg jeans\", \"waxed cotton field jacket\", \"rain cover for a cargo bike box\"" },
+        targetGroup: { type: "string", enum: TARGET_GROUPS, description: "Who the item is for. not_fashion for non-clothing items." },
+        topLevelIds: { type: "array", items: { type: "string" }, description: "1 or 2 top-level category ids from the list in the instructions, most likely first" },
+        categoryGuess: { type: "string", description: "Best guess of the full Vinted category path in English, e.g. \"Men > Clothing > Jeans > Straight fit jeans\"" },
+        brand: { type: "string", description: "Brand you can actually see (logo, label, patch, embroidered mark). Empty string if not visible." },
+        brandEvidence: { type: "string", description: "Where exactly you saw the brand. Empty string if no brand." },
+        sizeLabel: { type: "string", description: "Size exactly as printed on a label or tag. Empty string if no size is readable." },
+        sizeCandidates: { type: "array", items: { type: "string" }, description: "How a Vinted size picker shows this size, best first, e.g. [\"W32\",\"M\"] or [\"38\",\"M\"] or [\"42\"]. Empty if unknown." },
+        colorCodes: { type: "array", items: { type: "string", enum: COLOR_CODES }, description: "1 or 2 main colours, main colour first" },
+        materials: { type: "array", items: { type: "string", enum: MATERIAL_NAMES }, description: "0-3 materials read on a label or unmistakable" },
+        condition: { type: "string", enum: CONDITION_KEYS, description: "Vinted condition" },
+        conditionReason: { type: "string", description: "One short sentence: the visible flaw, or 'no visible flaws'" },
+        suggestedTitle: { type: "string", description: "Listing title, max 60 characters, in the requested language" },
+        suggestedTags: { type: "array", items: { type: "string" }, description: "5-8 search words in the requested language" },
+        suggestedPrice: { type: "number", description: "Realistic second-hand price on Vinted in EUR" },
+        quantity: { type: "number", description: "Number of identical items shown. 1 if one item." },
         photoOrder: {
           type: "array",
           items: {
             type: "object",
             properties: {
-              imageIndex: { type: "number", description: "0-based index of the image in the input array" },
-              type: { type: "string", enum: ["hero", "label", "detail", "packaging"], description: "hero = full product visible (best listing photo), label = tag/sticker/size label visible, detail = close-up of texture/pattern/damage, packaging = box/bag/wrapping" },
-              score: { type: "number", description: "Quality score 1-10. Hero shots with good lighting/angle score highest. Label shots score 7-8. Detail shots 5-6." }
+              imageIndex: { type: "number", description: "0-based index of the image" },
+              type: { type: "string", enum: ["hero", "label", "detail", "packaging"] },
+              score: { type: "number", description: "1-10, best listing cover photo highest" },
             },
-            required: ["imageIndex", "type", "score"]
+            required: ["imageIndex", "type", "score"],
           },
-          description: "Score and classify each input photo. Order by score descending (best photo first)."
-        }
+          description: "Every input photo classified and scored, best first",
+        },
       },
-      required: ["category", "subcategory", "condition", "suggestedTitle", "suggestedTags", "quantity", "photoOrder"]
-    }
-  }
+      required: [
+        "itemType", "targetGroup", "topLevelIds", "categoryGuess", "brand", "brandEvidence", "sizeLabel",
+        "sizeCandidates", "colorCodes", "condition", "conditionReason", "suggestedTitle", "suggestedTags",
+        "quantity", "photoOrder",
+      ],
+    },
+  },
 };
 
-// Fallback: Try to extract JSON from text response
-function extractJsonFromText(text: string): AnalysisResult | null {
-  if (!text) return null;
-  
-  try {
-    // Remove markdown code blocks
-    let jsonStr = text.trim();
-    if (jsonStr.startsWith('```json')) {
-      jsonStr = jsonStr.slice(7);
-    } else if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.slice(3);
-    }
-    if (jsonStr.endsWith('```')) {
-      jsonStr = jsonStr.slice(0, -3);
-    }
-    
-    // Try to find JSON object in text
-    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
-    }
-    
-    return JSON.parse(jsonStr.trim());
-  } catch {
-    return null;
-  }
+function stage1Prompt(language: string, tree: CatalogTree): string {
+  const lang = language === "nl" ? "Dutch" : "English";
+  return `You are an experienced second-hand reseller who lists items on Vinted every day: vintage clothing, shoes, bags, home goods, bikes and more. From the seller's photos you fill in the Vinted listing form exactly as a careful, experienced seller would.
+
+Work in this order:
+1. Look at ALL photos together. Find the single item that is for sale. If it is attached to or shown on something bigger (a bike, a person, a mannequin, a hanger), the item for sale is the garment or accessory, not the bigger thing.
+2. Read every piece of visible text: logos, woven or printed labels, leather patches, tabs, size tags, care labels, hang tags, packaging.
+3. Fill in the fields.
+
+BRAND
+- Only give a brand you can actually SEE on the item: a logo, label, patch, tab, embroidered text, or an unmistakable logo mark (for example the Lacoste crocodile, the Polo Ralph Lauren polo player, the Tommy Hilfiger flag, the Levi's red tab or two-horse patch, the Carhartt square C label, the Nike swoosh, the Adidas trefoil or three-bar logo).
+- An accessory made for a specific product (a rain cover, seat or bag for a bike, pram or car) usually carries that maker's logo or initials: use that brand, and confirm it with the brand name visible on the product if shown.
+- Never guess a brand from style, shape or colour. If you cannot see it, brand = "".
+- brandEvidence: exactly where you saw it, e.g. "red tab on back pocket reads LEVI'S" or "UA logo on the front of the cover, URBAN ARROW printed on the bike".
+
+SIZE
+- Read the size label character by character. sizeLabel = exactly what it says ("W32 L34", "M", "EU 38 / UK 10", "104 cm"). If no size is readable, sizeLabel = "" and sizeCandidates = []. Never guess a size from how the item looks.
+- sizeCandidates: how a Vinted size picker shows it, best first. Jeans: waist as "W32" (plus a letter size only if printed). Letter sizes: "XS", "S", "M", "L", "XL", "XXL". Numeric women's sizes: the EU number ("38"). Shoes: EU size ("42"). Kids: height in cm ("104"). One-size items: "One size".
+
+COLOURS
+- colorCodes: 1 or 2 Vinted colours, main colour first. MULTI for prints or 3+ strong colours. Transparent plastic is CLEAR. Blue denim is BLUE (very dark indigo can be NAVY).
+
+MATERIALS
+- Only what a label says, or what is unmistakable (denim for jeans, leather for leather boots, wool for a wool knit, fleece). Up to 3. Leave empty when unsure.
+
+CONDITION (Vinted's own definitions)
+- new_with_tags: unused, with the original tags attached or in the original packaging.
+- new_without_tags: unused, without tags or packaging.
+- very_good: lightly used, may have slight imperfections, but still looks great. This is the normal condition of a clean second-hand item.
+- good: used, with clearly visible imperfections or signs of wear (pilling, fading, small stains, scuffs, worn edges).
+- satisfactory: frequently used, with clear damage such as holes, tears, heavy stains, heavy fading or broken parts.
+Rules: judge only flaws you can actually see on the item itself. Rain or water drops, dust, dirt that wipes off, creases, background clutter and lighting are NOT wear. Normal vintage character (faded denim, soft patina) alone is very_good. When in doubt between two conditions, choose the better one. conditionReason names the visible flaw, or "no visible flaws".
+
+CATEGORY
+- topLevelIds: the 1 or 2 most likely top-level ids from the list below, most likely first.
+- itemType, targetGroup and categoryGuess as precise as you can.
+
+TITLE (write it in ${lang}, max 60 characters)
+- Like experienced Vinted sellers: [Brand] [model or item type] [key detail such as colour, fit or print] [size].
+- Use a model name only if you can read it. No marketing words, no emojis, no repeated words. Brand names stay as they are.
+- Start with "Vintage" only when the item is clearly vintage (dated labels, made-in tags typical of the 70s to 90s, clear 80s or 90s design, age patina).
+
+TAGS: 5 to 8 search words in ${lang} that buyers would type.
+PRICE: a realistic second-hand price on Vinted in EUR for this brand, item and condition.
+QUANTITY: number of identical items for sale (1 if one item).
+PHOTO ORDER: classify and score every photo; the best cover photo (whole item, sharp, well lit) first.
+
+Top-level categories (id: name (main subcategories)):
+${topLevelOverview(tree)}`;
 }
 
-function buildSystemPrompt(language: string): string {
-  // Language-specific instructions for title generation
-  const titleLanguageInstruction = language === 'nl' 
-    ? 'Generate ALL text output in DUTCH only. Use Dutch product terminology.'
-    : 'Generate ALL text output in ENGLISH only. Translate Dutch terms: "bakfiets" → "cargo bike", "fiets" → "bicycle", "jurk" → "dress", "broek" → "trousers", "schoenen" → "shoes", etc.';
+const stage2Tool = {
+  type: "function",
+  function: {
+    name: "choose_category",
+    description: "Choose the exact Vinted category",
+    parameters: {
+      type: "object",
+      properties: { catalogId: { type: "string", description: "One id from the list" } },
+      required: ["catalogId"],
+    },
+  },
+};
 
-  // CRITICAL: Strict prompt that prioritizes reading literal text
-  const systemPrompt = `You are a product listing analyst for Vinted (EU marketplace). Your PRIMARY job is to READ TEXT from product photos.
+const STAGE2_PROMPT = `You choose the exact Vinted category for an item that a seller is listing. Pick the single best category id from the list.
+Rules:
+- Pick the most specific category that an experienced Vinted seller would choose, so buyers find the item.
+- Respect the target group for clothing and shoes (women, men, kids). For unisex adult clothing decide by cut and size; if still unclear, choose men for workwear, outdoor jackets and hoodies, women for clearly feminine cuts.
+- Avoid "Other" categories when a specific one fits.
+- Seller convention: rain covers, canopies and weather covers for cargo bikes or bike boxes go in the category for panniers and bike bags.
+- Answer only with an id that is in the list.`;
 
-=== LANGUAGE RULE (CRITICAL) ===
-${titleLanguageInstruction}
-The user has selected ${language === 'nl' ? 'Dutch' : 'English'} as their language. ALL output fields (suggestedTitle, suggestedTags, category names) MUST be in this language.
-
-=== CRITICAL READING RULES ===
-1. **PRODUCT NAME**: The hang tag or barcode sticker has the EXACT product name printed on it - read it CHARACTER BY CHARACTER.
-   - Do NOT guess or approximate - zoom into sticker text mentally and read each letter
-   - The barcode sticker is the MOST RELIABLE source for the exact product name and size
-   - Example: If sticker reads "Henrietta Midi Dress" → use EXACTLY that, not "Aullie" or any other name
-   - NEVER invent descriptive names like "Blue Textured Ruffled Dress"
-   - Only describe visually if NO text/labels are visible anywhere
-
-2. **BRAND DETECTION**: 
-   - The LARGEST text on packaging/labels is usually the brand
-   - Check: hang tags, printed packaging, sewn-in labels
-   - Common fashion brands: Peppermayo, Zara, H&M, ASOS, Shein, Nike, Adidas, etc.
-
-3. **SIZE READING** - READ THE PHYSICAL LABEL CHARACTER BY CHARACTER:
-   - CRITICAL: The barcode sticker or size label shows the EXACT size - read every character!
-   - Do NOT guess size from item appearance - ONLY report what is READABLE on labels
-   - If sticker shows "AU6" → that means AU6, NOT AU8 or AU10
-   - If sticker shows "US2" → that means US2, NOT US4
-   - Look for ALL size formats on the label: AU, US, UK, EU numbers
-   - Common label formats: "Size AU6", "AU 6", "S", "M", "36", "UK8", "US4"
-  - PRIORITY ORDER for suggestedTitle: EU > UK > US > AU (for Vinted European marketplace)
-  - In suggestedTitle: ONLY use EU size (e.g., "EU34", "EU36", "EU38")
-  - If no EU size visible, CONVERT using this EXACT table (DO NOT deviate):
-    AU4=EU32, AU6=EU34, AU8=EU36, AU10=EU38, AU12=EU40, AU14=EU42, AU16=EU44
-    US0=EU32, US2=EU34, US4=EU36, US6=EU38, US8=EU40, US10=EU42
-    UK4=EU32, UK6=EU34, UK8=EU36, UK10=EU38, UK12=EU40, UK14=EU42
-  - CRITICAL: AU8 = EU36 (NOT EU38!). AU10 = EU38. Double-check your conversion!
-  - In size field: Include ALL visible sizes separated by " / " (e.g., "EU36 / US4 / AU8")
-
-4. **CONDITION DETECTION** (be accurate!):
-   - "new" = Item still in plastic packaging OR hang tags with string attached OR price sticker visible
-   - "very_good" = No tags, but looks completely unused/pristine
-   - "good" = Minor wear visible, light use
-   - "fair" = Visible damage, stains, or significant wear
-
-5. **CATEGORY PATHS** - ALWAYS include "Clothing" or "Shoes" level. ONLY use exact subtypes listed below:
-
-  **JEANS** (Women/Men > Clothing > Jeans > ...):
-  Valid: Boyfriend jeans, Cropped jeans, Flared jeans, High waisted jeans, Ripped jeans, Skinny jeans, Straight jeans, Other
-  FORBIDDEN: "Low-rise jeans", "Mom jeans", "Wide leg jeans", "Bootcut jeans"
-  MAPPING: Low-rise → Straight jeans, Mom jeans → High waisted jeans, Wide leg → Flared jeans, Bootcut → Flared jeans
-
-  **DRESSES** (Women > Clothing > Dresses > ...):
-  Valid: Long dresses (maxi/ankle), Midi dresses (knee-calf), Mini dresses (above knee), Other
-  FORBIDDEN: "Maxi dresses", "Wrap dresses", "Shift dresses", "A-line dresses"
-  MAPPING: Maxi → Long dresses, any other style → closest length match
-
-  **TOPS & T-SHIRTS** (Women > Clothing > Tops & t-shirts > ...):
-  Valid: Blouses, Crop tops, Long sleeve tops, Short sleeve tops, Sleeveless tops, Tank tops, Tunics, Other
-  FORBIDDEN: "Camisoles", "Bodysuits", "Peplum tops"
-
-  **JUMPERS & SWEATSHIRTS** (Women > Clothing > Jumpers & sweatshirts > ...):
-  Valid: Cardigans, Crew neck jumpers, Hoodies, Roll neck jumpers, V-neck jumpers, Other
-
-  **SKIRTS** (Women > Clothing > Skirts > ...):
-  Valid: Long skirts, Midi skirts, Mini skirts, Other
-
-  **TROUSERS & LEGGINGS** (Women > Clothing > Trousers & leggings > ...):
-  Valid: Chinos, Joggers, Leggings, Straight leg trousers, Wide leg trousers, Other
-
-  **COATS & JACKETS** (Women > Clothing > Coats & jackets > ...):
-  Valid: Blazers, Bomber jackets, Denim jackets, Down jackets, Duffle coats, Leather jackets, Parkas, Trench coats, Other
-
-  **SHOES** (Women/Men > Shoes > ...):
-  Valid: Ankle boots, Ballet flats, Boots, Espadrilles, Heels, Loafers, Mules & clogs, Platforms, Sandals, Slippers, Sneakers, Other
-  FORBIDDEN: "Trainers" (use Sneakers), "Pumps" (use Heels or Ballet flats)
-
-  **MEN T-SHIRTS** (Men > Clothing > T-shirts > ...):
-  Valid: Long sleeve t-shirts, Polo shirts, Print t-shirts, Short sleeve t-shirts, Sleeveless t-shirts, Other
-
-  **ELECTRONICS**: Electronics > Video games & consoles > Games
-
-  GENERAL RULE: If the exact subtype is NOT in the valid list above, choose the CLOSEST match based on fit/style for maximum search visibility. NEVER use "Other" if a reasonable match exists — "Other" gets less search traffic.
-
- 6. **DRESS TYPES**:
-  - "Maxi" = Long dresses (ankle length)
-  - "Midi" = Midi dresses (knee to calf)
-  - "Mini" = Mini dresses (above knee)
-
-7. **ACCESSORY DETECTION** (IMPORTANT):
-   - If photo shows an item ATTACHED TO a larger product (bike, car, stroller):
-   - Focus on the ACCESSORY being sold, NOT the main product it's attached to
-   - Examples:
-   * Rain canopy on cargo bike → title about the CANOPY, category = cycling accessories
-   * Child seat on bike → title about the SEAT, category = Kids' bike seats
-   * Phone holder on bike → title about the HOLDER, category = cycling accessories
-   * Bike bag/basket → title about the BAG/BASKET, category = cycling accessories
-   - Look for: covers, canopies, seats, bags, racks, baskets, trailers, holders, lights
-   - If the accessory has its own brand/label visible, use THAT brand, not the bike brand
-
-8. **BIKE CATEGORY PATHS** - Always include specific bike type:
-  - Sports > Cycling > Bikes > Cargo bikes (for bakfietsen, longtails)
-  - Sports > Cycling > Bikes > City bikes (for stadsfietsen, omafietsen)
-  - Sports > Cycling > Bikes > Mountain bikes (for MTB, ATB)
-  - Sports > Cycling > Bikes > Road bikes (for racefietsen)
-  - Sports > Cycling > Bikes > Folding bikes (for vouwfietsen)
-  - Sports > Cycling > Bikes > Other bikes (if type unclear)
-  - Sports > Cycling > Electric bikes (for e-bikes - SEPARATE category, not under Bikes!)
-  - Sports > Cycling > Kids' bike seats (for kinderzitjes)
-  - Sports > Cycling > Cycling accessories & tools > [specific sub-type] (ALWAYS pick a sub-type!):
-    Valid: Bike baskets, Bike bells & horns, Bike fenders & mudguards, Bike lights, Bike locks, Bike water bottles, Bottle cages, Bike pumps, Kickstands, Panniers & bike bags, Bike tools, Bike stands & wall-mounts, Bike pannier racks, Car bike racks, Bike boxes & travel bags, Other bike accessories
-    Examples: rain cover/canopy → Panniers & bike bags, light → Bike lights, lock → Bike locks, pump → Bike pumps, generic → Other bike accessories
-
-9. **QUANTITY DETECTION** (CRITICAL for listings):
-  - Count the number of IDENTICAL items visible in the photo
-  - If you see 3 Pokémon ETBs stacked → quantity = 3
-  - If you see 1 dress → quantity = 1
-  - If you see 5 identical booster packs → quantity = 5
-  - Only count IDENTICAL items, not different products
-  - Default to 1 if unclear
-
-10. **PHOTO SCORING** (CRITICAL - score EVERY input image):
-  - For EACH image provided, return a photoOrder entry with imageIndex, type, and score
-  - Types: "hero" (full product, best for listing thumbnail), "label" (tag/sticker/barcode), "detail" (close-up texture/pattern), "packaging" (box/bag)
-  - Score 1-10: hero shots with good lighting = 9-10, label/tag photos = 7-8, detail shots = 5-6, blurry/dark = 1-3
-  - The BEST hero shot should be the first photo in a listing (customers see it first)
-  - Sort photoOrder by score descending
-
-=== TITLE FORMAT (max 40 chars) ===
-[Brand] [Exact Product Name] [EU Size]
-Example: "Peppermayo Aullie Maxi Dress EU36"
-
-FORBIDDEN in titles:
-- Made-up descriptive names
-- Marketing words (Beautiful, Stunning, Amazing)
-- Redundant words (Dress Dress, New New)
-- AU sizes (always convert to EU for title)`;
-  return systemPrompt;
-}
+// ---------------------------------------------------------------------------------------------
 
 const VALID_LANGUAGES = ["nl", "en"];
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB per foto (base64)
 const IMAGE_RE = /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i;
 const MAX_IMAGES = 10;
-const MAX_IMAGES_FOR_AI = 3;
+const MAX_IMAGES_FOR_AI = 6;
 const MAX_AI_ATTEMPTS = 2;
-
-const CONDITION_MAP: Record<string, string> = {
-  new: "nieuw",
-  very_good: "zeer_goed",
-  good: "goed",
-  fair: "redelijk",
-};
 
 function aiError(language: string, code: string, status: number): Response {
   const en = language === "en";
@@ -291,8 +195,8 @@ function aiError(language: string, code: string, status: number): Response {
   return json({ error: en ? english : nl, error_code: code === "NO_API_KEY" ? "AI_ERROR" : code }, status);
 }
 
-/** Haalt het analyseresultaat uit het AI-antwoord (eerst de tool-aanroep, anders tekst met JSON). */
-function extractAnalysis(aiResponse: any): AnalysisResult | null {
+/** Haalt de argumenten van de tool-aanroep uit het antwoord (of JSON uit de tekst). */
+function toolArgs(aiResponse: any): any | null {
   const message = aiResponse?.choices?.[0]?.message;
   const args = message?.tool_calls?.[0]?.function?.arguments;
   if (args) {
@@ -302,8 +206,19 @@ function extractAnalysis(aiResponse: any): AnalysisResult | null {
       // val terug op de tekst
     }
   }
-  return typeof message?.content === "string" ? extractJsonFromText(message.content) : null;
+  const text = typeof message?.content === "string" ? message.content : "";
+  const m = text.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try {
+    return JSON.parse(m[0]);
+  } catch {
+    return null;
+  }
 }
+
+const str = (v: unknown, max = 200) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+const strList = (v: unknown, maxItems: number, maxLen = 60) =>
+  Array.isArray(v) ? v.map((x) => str(x, maxLen)).filter(Boolean).slice(0, maxItems) : [];
 
 Deno.serve(async (req) => {
   const early = preflight(req);
@@ -313,9 +228,9 @@ Deno.serve(async (req) => {
   let reserved: { licenseId: string; month: string } | null = null;
 
   try {
-    const parsed = await readJson(req, 15 * 1024 * 1024);
+    const parsed = await readJson(req, 16 * 1024 * 1024);
     if (!parsed.ok) return parsed.response;
-    const { image, images, language: rawLanguage } = parsed.body;
+    const { image, images, language: rawLanguage, catalog: rawCatalog } = parsed.body;
     const language = VALID_LANGUAGES.includes(rawLanguage) ? rawLanguage : "en";
     const en = language === "en";
 
@@ -363,54 +278,97 @@ Deno.serve(async (req) => {
     }
     reserved = { licenseId: license.id, month };
 
-    // AI-aanroep
-    const userContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
+    const tree = clientCatalog(rawCatalog) ?? snapshotCatalog();
+    const started = Date.now();
+    // Hooguit 45 seconden AI in totaal, zodat de extensie (60 s) altijd een antwoord krijgt.
+    const deadline = started + 45_000;
+
+    // ---------- Stap 1: de foto's ----------
+    const photos = (imageList.slice(0, MAX_IMAGES_FOR_AI) as string[]).map((url) => ({ type: "image_url", image_url: { url } }));
+    const userContent = [
       {
         type: "text",
-        text: imageList.length > 1
-          ? "Analyze these product photos. READ ALL VISIBLE TEXT on labels, tags, and packaging. Combine info from all photos."
-          : "Analyze this product photo. READ ALL VISIBLE TEXT on labels, tags, and packaging carefully.",
+        text: photos.length > 1
+          ? `These ${photos.length} photos all show the same item for sale. Read all visible text on labels, tags and logos, then fill in the listing.`
+          : "This photo shows an item for sale. Read all visible text on labels, tags and logos, then fill in the listing.",
       },
-      ...(imageList.slice(0, MAX_IMAGES_FOR_AI) as string[]).map((url) => ({ type: "image_url", image_url: { url } })),
+      ...photos,
     ];
 
-    let analysis: AnalysisResult | null = null;
+    let s1: Stage1 | null = null;
+    let s1Model = "";
     let lastCode = "AI_NO_CONTENT";
     let lastStatus = 500;
-    // Hooguit 40 seconden AI in totaal, zodat de extensie (60 s) altijd een antwoord krijgt.
-    const deadline = Date.now() + 40_000;
-    for (let attempt = 0; attempt < MAX_AI_ATTEMPTS && !analysis; attempt++) {
-      if (attempt > 0 && deadline - Date.now() < 12_000) break;
+    for (let attempt = 0; attempt < MAX_AI_ATTEMPTS && !s1; attempt++) {
+      if (attempt > 0 && deadline - Date.now() < 15_000) break;
       if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
       const ai = await callGemini("analyze", {
         messages: [
-          { role: "system", content: buildSystemPrompt(language) },
+          { role: "system", content: stage1Prompt(language, tree) },
           { role: "user", content: userContent },
         ],
-        tools: [analysisToolSchema],
-        tool_choice: { type: "function", function: { name: "analyze_product" } },
+        tools: [stage1Tool],
+        tool_choice: { type: "function", function: { name: "fill_vinted_listing" } },
         max_tokens: 4096,
-      }, { deadline });
+      }, { deadline: deadline - 6_000 });
       if (!ai.ok) {
         lastCode = ai.code;
         lastStatus = ai.status === 429 || ai.status === 402 ? ai.status : 500;
         if (ai.code !== "AI_ERROR") break; // geen zin om opnieuw te proberen
         continue;
       }
-      analysis = extractAnalysis(ai.data);
-      if (!analysis) {
-        lastCode = "AI_NO_CONTENT";
-        console.warn(`[${requestId}] geen bruikbaar resultaat van ${ai.model} (poging ${attempt + 1})`);
-      } else {
-        console.log(`[${requestId}] analyse gelukt met ${ai.model}`);
-      }
+      s1 = toolArgs(ai.data);
+      s1Model = ai.model;
+      if (!s1) console.warn(`[${requestId}] stap 1: geen bruikbaar resultaat van ${ai.model} (poging ${attempt + 1})`);
     }
 
-    if (!analysis) {
+    if (!s1) {
       await releaseUsage(reserved.licenseId, reserved.month, "analysis");
       reserved = null;
       return aiError(language, lastCode, lastStatus);
     }
+    const s1Ms = Date.now() - started;
+
+    // ---------- Stap 2: de exacte categorie uit de echte Vinted-lijst ----------
+    const rootIds = strList(s1.topLevelIds, 2, 12)
+      .map((x) => parseInt(x, 10))
+      .filter((id) => tree.roots.includes(id));
+    if (rootIds.length === 0) rootIds.push(...tree.roots); // onbekend: alles
+    const { lines, ids: candidateIds } = leafLines(tree, rootIds);
+    const guess = [str(s1.categoryGuess), str(s1.itemType)].filter(Boolean).join(" | ");
+
+    let catalogId: number | null = null;
+    let s2Model = "";
+    if (candidateIds.size > 0 && deadline - Date.now() > 4_000) {
+      const item = {
+        itemType: str(s1.itemType),
+        targetGroup: str(s1.targetGroup),
+        categoryGuess: str(s1.categoryGuess),
+        title: str(s1.suggestedTitle),
+        brand: str(s1.brand),
+        materials: strList(s1.materials, 3),
+        tags: strList(s1.suggestedTags, 8),
+      };
+      const ai = await callGemini("category", {
+        messages: [
+          { role: "system", content: STAGE2_PROMPT },
+          { role: "user", content: `Item:\n${JSON.stringify(item)}\n\nCategories (id: path):\n${lines}` },
+        ],
+        tools: [stage2Tool],
+        tool_choice: { type: "function", function: { name: "choose_category" } },
+        max_tokens: 1024,
+      }, { deadline });
+      if (ai.ok) {
+        s2Model = ai.model;
+        const picked = parseInt(String(toolArgs(ai.data)?.catalogId ?? ""), 10);
+        if (candidateIds.has(picked)) catalogId = picked;
+        else console.warn(`[${requestId}] stap 2: id ${picked} staat niet in de lijst`);
+      } else {
+        console.warn(`[${requestId}] stap 2 mislukt: ${ai.code}`);
+      }
+    }
+    if (catalogId === null) catalogId = lexicalBestLeaf(tree, candidateIds, guess);
+    const s2Ms = Date.now() - started - s1Ms;
 
     // Is de gebruiker intussen weg (popup gesloten), dan telt deze analyse niet.
     if (req.signal.aborted) {
@@ -419,11 +377,62 @@ Deno.serve(async (req) => {
       return json({ error: "Client went away", error_code: "CLIENT_GONE" }, 499);
     }
 
-    if (analysis.condition && CONDITION_MAP[analysis.condition]) {
-      analysis.condition = CONDITION_MAP[analysis.condition];
-    }
-    analysis = repairCategoryPath(analysis);
+    // ---------- Antwoord opbouwen ----------
+    const conditionKey: ConditionKey = CONDITION_KEYS.includes(s1.condition as ConditionKey)
+      ? (s1.condition as ConditionKey)
+      : "very_good";
+    const colorIds = strList(s1.colorCodes, 2, 20).map((c) => COLORS[c]).filter((n): n is number => !!n);
+    const materialIds = strList(s1.materials, 3, 30).map((m) => MATERIALS[m]).filter((n): n is number => !!n);
+    const brand = str(s1.brand, 60);
+    const sizeLabel = str(s1.sizeLabel, 60);
+    const catalogPath = catalogId !== null && isLeaf(tree, catalogId) ? pathOf(tree, catalogId) : [];
 
+    // Velden voor oudere versies van de extensie (1.1.0): hoofdcategorie in het Engels en de staat als code.
+    const snap = snapshotCatalog();
+    let rootId: number | undefined = catalogId ?? undefined;
+    for (let i = 0; rootId !== undefined && i < 12; i++) {
+      const parent = tree.byId.get(rootId)?.parent;
+      if (!parent) break;
+      rootId = parent;
+    }
+    if (!catalogPath.length) rootId = undefined;
+    const legacyMain = rootId && snap.byId.get(rootId) ? snap.byId.get(rootId)!.title : catalogPath[0] ?? "";
+    const legacySub = catalogPath.slice(1).join(" > ");
+
+    const analysis = {
+      // Oude velden (blijven werken voor 1.1.0)
+      category: legacyMain,
+      subcategory: legacySub,
+      brand,
+      size: sizeLabel,
+      color: strList(s1.colorCodes, 2, 20).filter((c) => COLOR_NAMES[c]).map((c) => COLOR_NAMES[c][en ? 1 : 0]).join(" / "),
+      material: strList(s1.materials, 3, 30).join(", "),
+      condition: CONDITIONS[conditionKey].legacy,
+      quantity: Number.isFinite(s1.quantity) && (s1.quantity as number) >= 1 ? Math.min(99, Math.round(s1.quantity as number)) : 1,
+      suggestedTitle: str(s1.suggestedTitle, 80),
+      suggestedTags: strList(s1.suggestedTags, 8, 40),
+      suggestedPrice: Number.isFinite(s1.suggestedPrice) ? Math.max(1, Math.round((s1.suggestedPrice as number) * 100) / 100) : undefined,
+      photoOrder: Array.isArray(s1.photoOrder) ? s1.photoOrder : [],
+      // Nieuw: alles wat de extensie op Vinted zelf invult
+      vinted: {
+        catalogId,
+        catalogPath,
+        catalogSource: tree.source,
+        statusId: CONDITIONS[conditionKey].id,
+        condition: conditionKey,
+        conditionReason: str(s1.conditionReason, 160),
+        colorIds,
+        materialIds,
+        brand,
+        brandEvidence: str(s1.brandEvidence, 160),
+        sizeLabel,
+        sizeCandidates: strList(s1.sizeCandidates, 4, 20),
+        itemType: str(s1.itemType, 80),
+        targetGroup: str(s1.targetGroup, 20),
+      },
+    };
+
+    console.log(`[${requestId}] analyse klaar: stap 1 ${s1Model} ${s1Ms} ms, stap 2 ${s2Model || "lexicaal"} ${s2Ms} ms, boom ${tree.source}`);
     return json({ analysis, usage: usageView(license.tier, reservation.count) });
   } catch (error) {
     console.error(`[${requestId}] analyze-image fout:`, error instanceof Error ? error.message : error);
@@ -431,66 +440,3 @@ Deno.serve(async (req) => {
     return json({ error: "Unknown error", error_code: "UNKNOWN_ERROR" }, 500);
   }
 });
-
-
-// Repair common category path issues
-const MAIN_CATEGORIES = ["Women", "Men", "Kids", "Home", "Electronics", "Entertainment", "Hobbies & Collectables", "Sports"];
-
-/** Hoofdcategorie altijd uit de vaste lijst, en nooit dubbel in het subpad. */
-function normalizeMainCategory(result: AnalysisResult): AnalysisResult {
-  if (!result.subcategory) return result;
-  const parts = result.subcategory.split(">").map((s) => s.trim()).filter(Boolean);
-  const isMain = (s: string) => MAIN_CATEGORIES.some((m) => m.toLowerCase() === s.toLowerCase());
-  let category = (result.category || "").trim();
-  // Subpad begint met een hoofdcategorie: die is leidend en gaat uit het subpad
-  if (parts.length > 1 && isMain(parts[0])) {
-    category = MAIN_CATEGORIES.find((m) => m.toLowerCase() === parts[0].toLowerCase())!;
-    parts.shift();
-  }
-  return { ...result, category, subcategory: parts.join(" > ") };
-}
-
-function repairCategoryPath(input: AnalysisResult): AnalysisResult {
-  const result = normalizeMainCategory(input);
-  if (!result.category || !result.subcategory) return result;
-  
-  const category = result.category;
-  let subcategory = result.subcategory;
-  
-  // Fashion categories that need "Clothing" level
-  const fashionCategories = ['Women', 'Men', 'Kids', 'Dames', 'Heren', 'Kinderen'];
-  const clothingTypes = [
-    'Dresses', 'Jurken', 'Tops', 'T-shirts', 'Jeans', 'Trousers', 'Broeken',
-    'Skirts', 'Rokken', 'Shorts', 'Jumpers', 'Sweaters', 'Jackets', 'Jassen',
-    'Coats', 'Outerwear', 'Suits', 'Blazers', 'Jumpsuits', 'Activewear',
-    'Swimwear', 'Lingerie', 'Nightwear', 'Blouses', 'Shirts', 'Hoodies',
-    'Mini dresses', 'Midi dresses', 'Long dresses', 'Maxi'
-  ];
-  
-  const shoeTypes = [
-    'Sneakers', 'Trainers', 'Boots', 'Heels', 'Flats', 'Sandals', 'Slippers',
-    'Sports shoes', 'Formal shoes', 'Loafers', 'Pumps'
-  ];
-  
-  if (fashionCategories.some(c => category.toLowerCase().includes(c.toLowerCase()))) {
-    const subcatParts = subcategory.split(' > ').map(s => s.trim());
-    const firstPart = subcatParts[0].toLowerCase();
-    
-    // Already has correct level
-    if (firstPart === 'clothing' || firstPart === 'kleding' || firstPart === 'shoes' || firstPart === 'schoenen') {
-      // Good - already has the level
-    }
-    // Check if first part is a clothing type (missing "Clothing" level)
-    else if (clothingTypes.some(t => firstPart.includes(t.toLowerCase()))) {
-      subcategory = 'Clothing > ' + subcategory;
-      console.log(`Repaired path: added Clothing level -> ${subcategory}`);
-    }
-    // Check if first part is a shoe type (missing "Shoes" level)
-    else if (shoeTypes.some(t => firstPart.includes(t.toLowerCase()))) {
-      subcategory = 'Shoes > ' + subcategory;
-      console.log(`Repaired path: added Shoes level -> ${subcategory}`);
-    }
-  }
-  
-  return { ...result, subcategory };
-}

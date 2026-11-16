@@ -1,5 +1,5 @@
 // Autoposter - Content Script for "Plakken" (auto-paste) on Vinted
-// Fills photos, title, description, price and category on the Vinted sell/edit page.
+// Fills photos, title, description, price, category, brand, size, condition, colour and material on the Vinted sell/edit page.
 // config.js is loaded before this file (manifest content_scripts).
 
 // Verbose console logging + "Copy debug info" button. Follows AP_CONFIG.DEV_MODE (false in store builds).
@@ -116,7 +116,14 @@ const translations = {
     stepPhotos: 'Stap 1/3: Foto\'s uploaden...',
     stepCategory: 'Stap 2/3: Categorie selecteren...',
     stepFields: 'Stap 3/3: Velden invullen...',
+    stepDetails: 'Merk, maat, staat en kleur invullen...',
     manualFields: 'Zelf invullen',
+    category: 'categorie',
+    brand: 'merk',
+    size: 'maat',
+    condition: 'staat',
+    colors: 'kleur',
+    material: 'materiaal',
     failed: 'mislukt'
   },
   en: {
@@ -146,7 +153,14 @@ const translations = {
     stepPhotos: 'Step 1/3: Uploading photos...',
     stepCategory: 'Step 2/3: Selecting category...',
     stepFields: 'Step 3/3: Filling fields...',
+    stepDetails: 'Filling brand, size, condition and colour...',
     manualFields: 'Fill in yourself',
+    category: 'category',
+    brand: 'brand',
+    size: 'size',
+    condition: 'condition',
+    colors: 'colour',
+    material: 'material',
     failed: 'failed'
   }
 };
@@ -2404,6 +2418,7 @@ async function handlePaste() {
       'lastPrice', 
       'lastCategory',
       'lastCategoryPath',
+      'lastVinted',
       'lastListingId',
       'listingData',
       'savedImages'
@@ -2458,8 +2473,27 @@ async function handlePaste() {
     // Pass flag to skip image upload if already done
     const results = await handleVintedAutofill(data, imagesAlreadyUploaded);
     
-    // STEP 3: Category last: the picker is the most fragile part and may take a few seconds.
-    if (data.lastCategoryPath) {
+    // STEP 3: Category, then the fields Vinted shows for that category (brand, size, condition, colour, material).
+    // Uses Vinted's own ids (same in every language); the old name-based picker is the fallback.
+    const vinted = data.lastVinted && typeof data.lastVinted === 'object' ? data.lastVinted : null;
+    const filler = window.AutoposterVinted;
+    if (vinted && filler) {
+      showNotification(`⏳ ${t('stepCategory')}`, 'info', 2000);
+      let categoryOk = await filler.selectCategory(vinted.catalogId);
+      if (!categoryOk && data.lastCategoryPath) {
+        categoryOk = await selectVintedCategory(data.lastCategoryPath);
+      }
+      results.push({ success: !!categoryOk, fieldName: t('category') });
+      if (categoryOk) {
+        showNotification(`⏳ ${t('stepDetails')}`, 'info', 2500);
+        const done = await filler.fillVintedFields(vinted, { category: false });
+        for (const [key, ok] of Object.entries(done)) {
+          if (ok !== undefined) results.push({ success: !!ok, fieldName: t(key) });
+        }
+      } else if (data.lastCategory) {
+        showNotification(`💡 ${t('categoryHint')}: ${data.lastCategory}`, 'info', 4000);
+      }
+    } else if (data.lastCategoryPath) {
       showNotification(`⏳ ${t('stepCategory')}`, 'info', 2000);
       const categorySuccess = await selectVintedCategory(data.lastCategoryPath);
       if (!categorySuccess && data.lastCategory) {

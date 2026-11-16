@@ -47,8 +47,8 @@ const Index = () => {
             <span className="text-primary">sneller klaar</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Voeg je foto's toe en krijg een voorstel voor titel, beschrijving en categorie. Eén klik op Plakken
-            en je foto's, titel, beschrijving, prijs en categorie staan in je Vinted-advertentie.
+            Voeg je foto's toe en de AI maakt je advertentie. Eén klik op Plakken en je foto's, titel,
+            beschrijving, prijs, categorie, merk, maat, staat en kleur staan in je Vinted-advertentie.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <InstallButton size="lg" />
@@ -70,12 +70,12 @@ const Index = () => {
             <FeatureCard
               icon={<Camera className="w-6 h-6" />}
               title="Foto's toevoegen"
-              description="Zet tot 10 foto's in de extensie. De AI bekijkt er maximaal 3, ook merk- en waslabels."
+              description="Zet tot 10 foto's in de extensie. De AI bekijkt er maximaal 6, ook merk- en maatlabels."
             />
             <FeatureCard
               icon={<FileText className="w-6 h-6" />}
               title="Voorstel van de AI"
-              description="Je krijgt een titel, een beschrijving (met merk, maat en kleur als die te zien zijn), een categorie en een tekst over de staat."
+              description="Je krijgt een titel, een beschrijving, de categorie uit Vinted's eigen lijst en het merk, de maat, de staat en de kleur."
             />
             <FeatureCard
               icon={<LayoutTemplate className="w-6 h-6" />}
@@ -85,7 +85,7 @@ const Index = () => {
             <FeatureCard
               icon={<ClipboardPaste className="w-6 h-6" />}
               title="Plakken op Vinted"
-              description="Klik op de verkooppagina van Vinted op Plakken. Foto's, titel, beschrijving, prijs en categorie worden ingevuld."
+              description="Klik op de verkooppagina van Vinted op Plakken. Foto's, titel, beschrijving, prijs, categorie, merk, maat, staat en kleur worden ingevuld."
             />
           </div>
         </div>
@@ -105,8 +105,8 @@ const Index = () => {
             />
             <BenefitItem
               icon={<CheckCircle className="w-5 h-5 text-primary" />}
-              title="Merk, maat, staat en kleur kies je zelf"
-              description="Vinted heeft daar aparte keuzevelden voor, die de extensie niet invult. Staan ze op de foto of het label, dan noemt de AI ze wel in de beschrijving."
+              title="Merk, maat, staat en kleur gaan mee"
+              description="De extensie kiest ze in Vinted's eigen keuzelijsten. Staat een merk of maat niet op de foto of het label, dan laat de AI dat vakje leeg in plaats van te gokken."
             />
             <BenefitItem
               icon={<Globe className="w-5 h-5 text-primary" />}
@@ -118,7 +118,7 @@ const Index = () => {
               title="Geen foto's op onze server"
               description={
                 <>
-                  Voor een analyse gaan maximaal 3 foto's en je tekst via onze server naar Google Gemini. Onze server
+                  Voor een analyse gaan maximaal 6 foto's en je tekst via onze server naar Google Gemini. Onze server
                   bewaart ze niet, en we verkopen geen gegevens.{" "}
                   <Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">
                     Lees de privacyverklaring

@@ -27,7 +27,7 @@ export const CONTROLLER = {
 // (dan gebruikt Google de foto's niet meer om zijn producten te verbeteren). De privacyverklaring past zich aan.
 export const GEMINI_PAID_TIER = false;
 
-export const PRIVACY_LAST_UPDATED = { nl: "14 november 2026", en: "14 November 2026" };
+export const PRIVACY_LAST_UPDATED = { nl: "16 november 2026", en: "16 November 2026" };
 
 export const VINTED_DOMAINS = [
   "vinted.nl",

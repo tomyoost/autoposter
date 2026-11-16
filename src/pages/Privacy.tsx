@@ -84,10 +84,16 @@ const PolicyNl = () => (
       <Section title="Wat naar onze server gaat">
         <H3>Voor de AI-voorstellen</H3>
         <P>
-          Vraag je een AI-analyse of een tekstvoorstel aan, dan stuurt de extensie maximaal 3 foto's en de tekst die je
+          Vraag je een AI-analyse of een tekstvoorstel aan, dan stuurt de extensie maximaal 6 foto's en de tekst die je
           in het formulier hebt getypt naar onze server. Die draait bij Supabase (Edge Functions) in de EU-regio
           Ierland. Onze server stuurt de foto's en tekst door naar de Google Gemini API, die een voorstel maakt voor
-          titel, beschrijving, categorie en staat.
+          titel, beschrijving, categorie, merk, maat, staat, kleur en materiaal.
+        </P>
+        <P>
+          Bij een analyse stuurt de extensie ook de categorielijst van Vinted mee, zoals Vinted die aan jou laat zien
+          (de namen en nummers van de categorieën, in jouw taal). Zo kiest de AI uit precies dezelfde lijst. Die
+          lijst haalt de extensie op als je een Vinted-pagina opent en bewaart hij in je browser. Er zitten geen
+          persoonsgegevens in.
         </P>
         <P>
           Onze server bewaart je foto's en advertentietekst niet: ze worden verwerkt en daarna weggegooid. Korte
@@ -259,10 +265,15 @@ const PolicyEn = () => (
       <Section title="What is sent to our server">
         <H3>For AI suggestions</H3>
         <P>
-          When you request an AI analysis or a text suggestion, the extension sends up to 3 photos and the listing
+          When you request an AI analysis or a text suggestion, the extension sends up to 6 photos and the listing
           text you typed in the form to our server. It runs on Supabase (Edge Functions) in the EU region Ireland. Our
           server passes the photos and text on to the Google Gemini API, which creates a suggestion for title,
-          description, category and condition.
+          description, category, brand, size, condition, colour and material.
+        </P>
+        <P>
+          With an analysis the extension also sends Vinted's category list as Vinted shows it to you (the names and
+          numbers of the categories, in your language), so the AI picks from exactly the same list. The extension
+          fetches that list when you open a Vinted page and keeps it in your browser. It contains no personal data.
         </P>
         <P>
           Our server does not store your photos or listing text: they are processed and then discarded. Short-lived
