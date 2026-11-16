@@ -85,7 +85,10 @@ export async function callGemini(
         sawRateLimit = true;
         break;
       }
-      if (res.status === 402) return { ok: false, status: 402, code: "AI_NO_CREDITS", detail: text };
+      if (res.status === 402) {
+        console.error(`Gemini ${model} gaf 402 (tegoed of betaling): ${text.slice(0, 300)}`);
+        return { ok: false, status: 402, code: "AI_NO_CREDITS", detail: text };
+      }
       if (res.status === 401 || res.status === 403) {
         // Sleutel of facturering geblokkeerd (bijv. kaart geweigerd): geldt voor alle modellen met deze sleutel
         console.error(`Gemini GEBLOKKEERD ${res.status} (sleutel of facturering): ${text.slice(0, 160)}`);
