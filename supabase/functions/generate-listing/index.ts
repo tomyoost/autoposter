@@ -307,6 +307,7 @@ REGELS
 - Geen markdown, geen emoji's, geen hashtags, geen em dash.
 - Geen prijs.
 - Verzin niets: geen maten, materialen, merken, afmetingen of gebreken die niet gegeven zijn.
+- Geen beweringen over pasvorm, comfort, zachtheid of draaggevoel: die kan de koper niet op de foto's zien.
 - Geen holle woorden als "prachtig", "perfect" of "must-have".`;
 
 const highConvertingDescriptionEN = `You write Vinted descriptions like an experienced seller: honest, clear and pleasant to read.
@@ -323,6 +324,7 @@ RULES
 - No markdown, no emojis, no hashtags, no em dash.
 - No price.
 - Do not invent anything: no sizes, materials, brands, measurements or flaws that are not given.
+- No claims about fit, comfort, softness or how it feels to wear: buyers cannot see that in the photos.
 - No empty words like "stunning", "perfect" or "must-have".`;
 
 const titlePromptNL = `Genereer een KORTE titel.

@@ -25,7 +25,7 @@ export const CONTROLLER = {
 
 // Zet op true zodra in Google AI Studio facturering aan staat voor de Gemini-sleutel van de Autoposter
 // (dan gebruikt Google de foto's niet meer om zijn producten te verbeteren). De privacyverklaring past zich aan.
-export const GEMINI_PAID_TIER = false;
+export const GEMINI_PAID_TIER = true;
 
 export const PRIVACY_LAST_UPDATED = { nl: "16 november 2026", en: "16 November 2026" };
 
