@@ -7,7 +7,7 @@ export type GeminiPurpose = "analyze" | "text" | "category";
 
 export type GeminiResult =
   | { ok: true; data: any; model: string }
-  | { ok: false; status: number; code: "NO_API_KEY" | "AI_RATE_LIMIT" | "AI_NO_CREDITS" | "AI_ERROR"; detail: string };
+  | { ok: false; status: number; code: "NO_API_KEY" | "AI_RATE_LIMIT" | "AI_NO_CREDITS" | "AI_ERROR" | "SERVICE_UNAVAILABLE"; detail: string };
 
 /** Kiest het model uit app_settings: ai_model_analyze / ai_model_text, met ai_model_fallback als reserve. */
 const MODEL_SETTING: Record<GeminiPurpose, string> = {
@@ -86,6 +86,11 @@ export async function callGemini(
         break;
       }
       if (res.status === 402) return { ok: false, status: 402, code: "AI_NO_CREDITS", detail: text };
+      if (res.status === 401 || res.status === 403) {
+        // Sleutel of facturering geblokkeerd (bijv. kaart geweigerd): geldt voor alle modellen met deze sleutel
+        console.error(`Gemini GEBLOKKEERD ${res.status} (sleutel of facturering): ${text.slice(0, 160)}`);
+        return { ok: false, status: 503, code: "SERVICE_UNAVAILABLE", detail: text };
+      }
       if (res.status === 400 && withEffort && /reasoning|thinking/i.test(text)) {
         withEffort = false; // dit model kent de denkinstelling niet: opnieuw zonder
         continue;

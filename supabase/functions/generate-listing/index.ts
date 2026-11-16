@@ -545,6 +545,12 @@ Deno.serve(async (req) => {
           error_code: "AI_RATE_LIMIT",
         }, 429);
       }
+      if (ai.ok === false && ai.code === "SERVICE_UNAVAILABLE") {
+        return json({
+          error: isEnglish ? "The AI service is temporarily unavailable. Please try again later." : "De AI-dienst is even niet bereikbaar. Probeer het later opnieuw.",
+          error_code: "SERVICE_UNAVAILABLE",
+        }, 503);
+      }
       return json({
         error: isEnglish ? "Could not generate text, please try again." : "Tekst maken mislukt, probeer het opnieuw.",
         error_code: "AI_ERROR",

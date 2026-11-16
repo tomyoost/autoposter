@@ -190,6 +190,7 @@ function aiError(language: string, code: string, status: number): Response {
     NO_API_KEY: ["AI-dienst niet ingesteld", "AI service not configured"],
     AI_NO_CONTENT: ["Geen analyseresultaat ontvangen", "No analysis result received"],
     AI_ERROR: ["AI-analyse mislukt", "AI analysis failed"],
+    SERVICE_UNAVAILABLE: ["De AI-dienst is even niet bereikbaar. Probeer het later opnieuw.", "The AI service is temporarily unavailable. Please try again later."],
   };
   const [nl, english] = messages[code] ?? messages.AI_ERROR;
   return json({ error: en ? english : nl, error_code: code === "NO_API_KEY" ? "AI_ERROR" : code }, status);
@@ -313,7 +314,7 @@ Deno.serve(async (req) => {
       }, { deadline: deadline - 6_000 });
       if (!ai.ok) {
         lastCode = ai.code;
-        lastStatus = ai.status === 429 || ai.status === 402 ? ai.status : 500;
+        lastStatus = ai.status === 429 || ai.status === 402 || ai.status === 503 ? ai.status : 500;
         if (ai.code !== "AI_ERROR") break; // geen zin om opnieuw te proberen
         continue;
       }
