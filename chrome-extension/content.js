@@ -2043,9 +2043,10 @@ function repairVintedCategoryPath(path) {
 
 // Count visible photo thumbnails on page
 function countVisibleThumbnails() {
-  // Vinted (gezien op het echte formulier, 15-11-2026): geüploade foto's staan in dit raster
+  // Vinted: geüploade foto's staan in dit raster. Sinds 17-11-2026 staan er ook lege tussenvakjes en de
+  // knop "foto toevoegen" in; die tellen niet. Alleen echte foto's (img) tellen.
   const grid = document.querySelector('[data-testid="media-upload-grid"]');
-  if (grid) return grid.children.length;
+  if (grid) return grid.querySelectorAll('img').length;
 
   const selectors = [
     '[class*="photo"] img',
@@ -2165,6 +2166,7 @@ async function uploadImagesToVinted(images) {
   }
   
   const CONFIRMATION_TIMEOUT = 10000; // Increased for stability
+  const PHOTO_SETTLE_MS = 900; // pauze na elke bevestigde foto (Vinted verwerkt nog)
   const DELAY_BETWEEN_UPLOADS = 2000; // Increased to prevent rate limiting
   const MAX_CONSECUTIVE_FAILURES = 3; // Stop after 3 consecutive failures
   
@@ -2252,6 +2254,9 @@ async function uploadImagesToVinted(images) {
         if (confirmed) {
           successCount++;
           uploaded = true;
+          // Vinted verwerkt een foto nog even na het tonen; zet je de volgende er te snel achteraan,
+          // dan valt er een weg (getest 17-11-2026). Even laten uitlopen.
+          await new Promise(r => setTimeout(r, PHOTO_SETTLE_MS));
           debugLog(`✅ Image ${i + 1} upload confirmed`);
           showNotification(`📷 ${t('uploadingPhotos')} (${successCount}/${images.length})`, 'info', 2000);
         } else {
