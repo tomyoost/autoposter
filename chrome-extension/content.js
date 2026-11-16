@@ -86,7 +86,9 @@ const PLATFORM_SELECTORS = {
 };
 
 // Translations
-let currentLang = 'en'; // Default to English
+// Language: the user's choice in the popup, otherwise the browser (Dutch for nl/nl-BE)
+const BROWSER_LANG = (navigator.language || '').toLowerCase().startsWith('nl') ? 'nl' : 'en';
+let currentLang = BROWSER_LANG;
 
 const translations = {
   nl: {
@@ -106,7 +108,7 @@ const translations = {
     copyFallback: 'Gekopieerd naar klembord - plak met Ctrl+V',
     step1Category: 'Stap 1/3: Categorie selecteren...',
     step2Fields: 'Stap 2/3: Velden invullen...',
-    step3Done: 'Stap 3/3: Klaar!',
+    step3Done: 'Klaar!',
     categoryNotFound: 'Categorie niet gevonden, selecteer handmatig',
     categorySelected: 'Categorie geselecteerd',
     searchingCategory: 'Categorie zoeken...',
@@ -114,9 +116,9 @@ const translations = {
     photosUploaded: 'foto\'s geüpload',
     photoUploadFailed: 'Foto upload mislukt, upload handmatig',
     stepPhotos: 'Stap 1/3: Foto\'s uploaden...',
-    stepCategory: 'Stap 2/3: Categorie selecteren...',
-    stepFields: 'Stap 3/3: Velden invullen...',
-    stepDetails: 'Merk, maat, staat en kleur invullen...',
+    stepCategory: 'Stap 3/3: Categorie selecteren...',
+    stepFields: 'Stap 2/3: Titel, beschrijving en prijs invullen...',
+    stepDetails: 'Stap 3/3: Merk, maat, staat en kleur invullen...',
     manualFields: 'Zelf invullen',
     category: 'categorie',
     brand: 'merk',
@@ -143,7 +145,7 @@ const translations = {
     copyFallback: 'Copied to clipboard - paste with Ctrl+V',
     step1Category: 'Step 1/3: Selecting category...',
     step2Fields: 'Step 2/3: Filling fields...',
-    step3Done: 'Step 3/3: Done!',
+    step3Done: 'Done!',
     categoryNotFound: 'Category not found, select manually',
     categorySelected: 'Category selected',
     searchingCategory: 'Searching category...',
@@ -151,9 +153,9 @@ const translations = {
     photosUploaded: 'photos uploaded',
     photoUploadFailed: 'Photo upload failed, upload manually',
     stepPhotos: 'Step 1/3: Uploading photos...',
-    stepCategory: 'Step 2/3: Selecting category...',
-    stepFields: 'Step 3/3: Filling fields...',
-    stepDetails: 'Filling brand, size, condition and colour...',
+    stepCategory: 'Step 3/3: Selecting category...',
+    stepFields: 'Step 2/3: Filling title, description and price...',
+    stepDetails: 'Step 3/3: Filling brand, size, condition and colour...',
     manualFields: 'Fill in yourself',
     category: 'category',
     brand: 'brand',
@@ -275,7 +277,7 @@ function t(key) {
 // Load language setting
 function loadLanguage() {
   chrome.storage.local.get(['language'], (result) => {
-    currentLang = result.language || 'en'; // Default to English
+    currentLang = result.language || BROWSER_LANG;
     updateButtonText();
   });
 }
@@ -2376,21 +2378,21 @@ async function handleVintedAutofill(data, skipImageUpload = false) {
   // Fill title
   if (data.lastTitle) {
     await waitForElement(selectors.titleField);
-    results.push(fillField(selectors.titleField, data.lastTitle, t('title')));
+    results.push({ ...fillField(selectors.titleField, data.lastTitle, t('title')), key: 'title' });
     await new Promise(r => setTimeout(r, 200));
   }
   
   // Fill description
   if (data.lastFormattedText) {
     await waitForElement(selectors.descriptionField);
-    results.push(fillField(selectors.descriptionField, data.lastFormattedText, t('description')));
+    results.push({ ...fillField(selectors.descriptionField, data.lastFormattedText, t('description')), key: 'description' });
     await new Promise(r => setTimeout(r, 200));
   }
   
   // Fill price
   if (data.lastPrice) {
     await waitForElement(selectors.priceField);
-    results.push(fillField(selectors.priceField, data.lastPrice, t('price')));
+    results.push({ ...fillField(selectors.priceField, data.lastPrice, t('price')), key: 'price' });
   }
   
   return results;
@@ -2406,6 +2408,7 @@ async function handlePaste() {
     return;
   }
   
+  const pasteStartedAt = Date.now();
   btn.innerHTML = `⏳ ${t('filling')}`;
   btn.disabled = true;
   btn.style.opacity = '0.7';
@@ -2483,12 +2486,12 @@ async function handlePaste() {
       if (!categoryOk && data.lastCategoryPath) {
         categoryOk = await selectVintedCategory(data.lastCategoryPath);
       }
-      results.push({ success: !!categoryOk, fieldName: t('category') });
+      results.push({ success: !!categoryOk, fieldName: t('category'), key: 'category' });
       if (categoryOk) {
         showNotification(`⏳ ${t('stepDetails')}`, 'info', 2500);
         const done = await filler.fillVintedFields(vinted, { category: false });
         for (const [key, ok] of Object.entries(done)) {
-          if (ok !== undefined) results.push({ success: !!ok, fieldName: t(key) });
+          if (ok !== undefined) results.push({ success: !!ok, fieldName: t(key), key });
         }
       } else if (data.lastCategory) {
         showNotification(`💡 ${t('categoryHint')}: ${data.lastCategory}`, 'info', 4000);
@@ -2506,6 +2509,23 @@ async function handlePaste() {
     // Process results
     const successfulFields = results.filter(r => r.success).map(r => r.fieldName);
     const failedFields = results.filter(r => !r.success).map(r => r.fieldName);
+
+    // Measure whether Paste worked (field names and counts only, never the listing text)
+    try {
+      chrome.runtime.sendMessage({
+        action: 'trackEvent',
+        event: 'paste_completed',
+        extra: {
+          platform: 'vinted',
+          site: location.hostname,
+          filled: successfulFields.length,
+          failed: failedFields.length,
+          failedFields: results.filter(r => !r.success).map(r => r.key || 'other').slice(0, 10),
+          photos: data.savedImages?.length || 0,
+          seconds: Math.round((Date.now() - pasteStartedAt) / 1000)
+        }
+      });
+    } catch (_) { /* meten mag plakken nooit storen */ }
     
     if (successfulFields.length > 0) {
       if (failedFields.length > 0) {
@@ -2695,7 +2715,7 @@ init();
 // Listen for language changes
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes.language) {
-    currentLang = changes.language.newValue || 'en';
+    currentLang = changes.language.newValue || BROWSER_LANG;
     updateButtonText();
   }
 });

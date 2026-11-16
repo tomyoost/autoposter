@@ -6,7 +6,7 @@ const translations = {
     tagline: 'Sneller verkopen op Vinted',
     
     // Intro
-    introText: 'Upload je foto\'s eerst. Autoposter analyseert automatisch je product en vult alle velden voor je in.',
+    introText: 'Voeg eerst je foto\'s toe, ook van het merk- en maatlabel. De AI maakt titel, beschrijving, prijsvoorstel, categorie, merk, maat, staat en kleur voor je.',
     
     // Sections
     productInfo: 'Productgegevens',
@@ -66,7 +66,7 @@ const translations = {
     step1Title: 'Upload Foto\'s',
     step1Desc: 'Sleep of klik om productfoto\'s toe te voegen',
     step2Title: 'AI Analyseert',
-    step2Desc: 'Onze AI vult automatisch alle velden in',
+    step2Desc: 'De AI maakt titel, beschrijving en prijs en kiest categorie, merk, maat, staat en kleur',
     step3Title: 'Plakken op Vinted',
     step3Desc: 'Open Vinted en klik rechtsonder op \'Plakken\'',
     getStarted: 'Aan de slag!',
@@ -211,6 +211,16 @@ const translations = {
     // Limit modal
     limitReachedTitle: 'Maandlimiet bereikt',
     limitReachedText: 'Je hebt al je AI analyses voor deze maand gebruikt.',
+    textLimitTitle: 'AI-teksten op voor deze maand',
+    textLimitText: 'Je hebt alle AI-beschrijvingen van deze maand gebruikt. Met een abonnement krijg je er meer.',
+    welcomePageTitle: 'Welkom bij Autoposter',
+    welcomePageIntro: 'In drie stappen klaar voor je eerste Vinted-advertentie:',
+    welcomeStepKey: 'Haal je gratis sleutel: 3 AI-analyses per maand, zonder betaling. Gumroad laat hem meteen zien en mailt hem ook.',
+    welcomeFreeBtn: 'Haal mijn gratis sleutel',
+    welcomeStepPaste: 'Plak de sleutel hieronder en klik op Activeren.',
+    welcomeStepPin: 'Zet Autoposter vast: klik rechtsboven in Chrome op het puzzelstukje en dan op de punaise naast Autoposter.',
+    welcomeDone: 'Klaar! Klik rechtsboven op het Autoposter-icoon en voeg je foto\'s toe. Daarna klik je op Vinted op Plakken.',
+    welcomeUpdate: 'Autoposter is vernieuwd. Je oude sleutel werkt niet meer: haal hieronder gratis een nieuwe.',
     limitReachedUpgrade: 'Upgrade voor meer analyses!',
     laterButton: 'Later',
     upgradeNow: 'Upgrade nu',
@@ -254,7 +264,7 @@ const translations = {
     tagline: 'Sell faster on Vinted',
     
     // Intro
-    introText: 'Upload your photos first. Autoposter automatically analyzes your product and fills in all fields for you.',
+    introText: 'Add your photos first, including the brand and size label. The AI creates the title, description, price suggestion, category, brand, size, condition and colour for you.',
     
     // Sections
     productInfo: 'Product details',
@@ -314,7 +324,7 @@ const translations = {
     step1Title: 'Upload Photos',
     step1Desc: 'Drag or click to add product photos',
     step2Title: 'AI Analyzes',
-    step2Desc: 'Our AI automatically fills all fields',
+    step2Desc: 'The AI writes title, description and price and picks category, brand, size, condition and colour',
     step3Title: 'Paste on Vinted',
     step3Desc: 'Open Vinted and click \'Paste\' at the bottom right',
     getStarted: 'Get Started!',
@@ -459,6 +469,16 @@ const translations = {
     // Limit modal
     limitReachedTitle: 'Monthly limit reached',
     limitReachedText: 'You have used all your AI analyses for this month.',
+    textLimitTitle: 'No AI texts left this month',
+    textLimitText: 'You have used all AI descriptions for this month. A subscription gives you more.',
+    welcomePageTitle: 'Welcome to Autoposter',
+    welcomePageIntro: 'Three steps to your first Vinted listing:',
+    welcomeStepKey: 'Get your free key: 3 AI analyses per month, no payment. Gumroad shows it right away and emails it too.',
+    welcomeFreeBtn: 'Get my free key',
+    welcomeStepPaste: 'Paste the key below and click Activate.',
+    welcomeStepPin: 'Pin Autoposter: click the puzzle piece at the top right of Chrome, then the pin next to Autoposter.',
+    welcomeDone: 'Done! Click the Autoposter icon at the top right and add your photos. Then click Paste on Vinted.',
+    welcomeUpdate: 'Autoposter has been renewed. Your old key no longer works: get a new free one below.',
     limitReachedUpgrade: 'Upgrade for more analyses!',
     laterButton: 'Later',
     upgradeNow: 'Upgrade now',
@@ -498,13 +518,18 @@ const translations = {
   }
 };
 
-// Get current language from storage or default to English
-let currentLanguage = 'en';
+// Get current language from storage, or follow the browser
+function browserLanguage() {
+  const lang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+  return lang.startsWith('nl') ? 'nl' : 'en';
+}
+let currentLanguage = browserLanguage();
 
 async function loadLanguage() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['language'], (result) => {
-      currentLanguage = result.language || 'en'; // Default to English
+      // No choice yet: follow the browser (Dutch for nl/nl-BE, otherwise English)
+      currentLanguage = result.language || browserLanguage();
       resolve(currentLanguage);
     });
   });

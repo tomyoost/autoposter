@@ -17,9 +17,25 @@
         <h1>Autoposter</h1>
       </div>
 
+      <!-- Welcome page (opened in a tab right after installing) -->
+      <div class="welcome" id="welcome" hidden>
+        <h2 data-i18n="welcomePageTitle">Welkom bij Autoposter</h2>
+        <p class="welcome-update" id="welcomeUpdate" data-i18n="welcomeUpdate" hidden></p>
+        <p class="welcome-intro" data-i18n="welcomePageIntro">In drie stappen klaar voor je eerste Vinted-advertentie:</p>
+        <ol class="welcome-steps">
+          <li>
+            <span data-i18n="welcomeStepKey">Haal je gratis sleutel.</span>
+            <a class="btn-free" data-config-url="FREE_URL" target="_blank" rel="noopener" data-i18n="welcomeFreeBtn">Haal mijn gratis sleutel</a>
+          </li>
+          <li data-i18n="welcomeStepPaste">Plak de sleutel hieronder en klik op Activeren.</li>
+          <li data-i18n="welcomeStepPin">Zet Autoposter vast.</li>
+        </ol>
+      </div>
+      <p class="welcome-done" id="welcomeDone" data-i18n="welcomeDone" role="status" hidden></p>
+
       <p class="subtitle" id="subtitle" data-i18n="licenseSubtitle">Vul je licentiesleutel in om Autoposter te activeren.</p>
 
-      <div class="input-group">
+      <div class="input-group" id="keyGroup">
         <input
           type="text"
           id="licenseKey"
@@ -52,6 +68,7 @@
   </div>
 
   <script src="config.js"></script>
+  <script src="analytics.js"></script>
   <script src="i18n.js"></script>
   <script src="license-api.js"></script>
   <script src="license.js"></script>

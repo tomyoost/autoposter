@@ -259,18 +259,24 @@ function showOnboarding() {
 
 function hideOnboarding() {
   const overlay = document.getElementById('onboardingOverlay');
+  const wasOpen = overlay && overlay.style.display !== 'none';
   if (overlay) {
     overlay.style.display = 'none';
   }
   chrome.storage.local.set({ showOnboarding: false });
+  if (wasOpen && typeof trackEvent === 'function') trackEvent('onboarding_completed');
 }
 
-// Show limit reached modal
-function showLimitModal() {
+// Show limit reached modal ('analysis' = photo analyses, 'text' = AI descriptions)
+function showLimitModal(kind = 'analysis') {
   const modal = document.getElementById('limitModal');
-  if (modal) {
-    modal.style.display = 'flex';
-  }
+  if (!modal) return;
+  const t = window.i18n.t;
+  const title = modal.querySelector('h3');
+  const text = modal.querySelector('.limit-modal-text');
+  if (title) title.textContent = t(kind === 'text' ? 'textLimitTitle' : 'limitReachedTitle');
+  if (text) text.textContent = t(kind === 'text' ? 'textLimitText' : 'limitReachedText');
+  modal.style.display = 'flex';
 }
 
 // Hide limit reached modal
@@ -1149,9 +1155,6 @@ function renderImagePreviews() {
         <button type="button" class="btn-img-action btn-download" data-index="${index}" title="Download">
           ⬇️
         </button>
-        <button type="button" class="btn-img-action btn-copy-base64" data-index="${index}" title="Copy Base64">
-          📋
-        </button>
       </div>
       <button type="button" class="remove-image" data-index="${index}">×</button>
       <span class="image-index">${index + 1}</span>
@@ -1231,14 +1234,6 @@ function renderImagePreviews() {
     });
   });
   
-  // Add copy base64 handlers
-  document.querySelectorAll('.btn-copy-base64').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      copyImageBase64(parseInt(e.currentTarget.dataset.index));
-    });
-  });
-  
   updateAnalyzeButton();
 }
 
@@ -1314,19 +1309,6 @@ function downloadImage(index) {
   document.body.removeChild(link);
   
   showToast(t('imageDownloaded'), 'success');
-}
-
-// Copy image base64
-function copyImageBase64(index) {
-  const t = window.i18n.t;
-  const img = uploadedImages[index];
-  if (!img) return;
-  
-  navigator.clipboard.writeText(img.data).then(() => {
-    showToast(t('base64Copied'), 'success');
-  }).catch(() => {
-    showToast('Could not copy', 'error');
-  });
 }
 
 function updateAnalyzeButton() {
@@ -1609,6 +1591,7 @@ function applyAnalysisResults(analysis) {
   // Map AI condition to form values
   const conditionMap = {
     'nieuw': 'nieuw',
+    'nieuw_zonder': 'nieuw_zonder',
     'zeer_goed': 'zeer_goed',
     'goed': 'goed',
     'redelijk': 'redelijk'
@@ -1851,6 +1834,10 @@ function getFormData() {
     size: analysisData.size,
     color: analysisData.color,
     material: analysisData.material,
+    // The AI's flaw note only fits a used item (the user may have changed the condition to new)
+    conditionNote: (analysisData.vinted && analysisData.vinted.conditionReason &&
+      !['nieuw', 'nieuw_zonder'].includes(document.getElementById('condition').value))
+      ? analysisData.vinted.conditionReason : '',
     categoryPath: analysisData.categoryPath
   };
 }
@@ -2017,7 +2004,12 @@ async function handleGenerateAI() {
         await handleLicenseApiError();
         return;
       }
-      // e.g. 429 GENERATION_LIMIT: monthly limit for AI texts reached
+      // 429 GENERATION_LIMIT: monthly limit for AI texts reached -> same upgrade window as for analyses
+      if (errorCode === 'GENERATION_LIMIT') {
+        showLimitModal('text');
+        if (typeof trackEvent === 'function') trackEvent('limit_reached', { kind: 'text' });
+        return;
+      }
       showToast(apiErrorMessage(response.status, errorCode, 'generate'), 'error', 6000);
       return;
     }

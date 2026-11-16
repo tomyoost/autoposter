@@ -131,7 +131,9 @@
       return false;
     }
     clickRow(radio);
-    const ok = await waitFor(() => !byTestId('catalog-select-dropdown-content') && opened.input.value, 3000);
+    // Only a success if exactly this category is in the field (not Vinted's own suggestion from the title)
+    const ok = await waitFor(() => !byTestId('catalog-select-dropdown-content') && norm(opened.input.value) === norm(node[2]), 3000);
+    if (!ok && byTestId('catalog-select-dropdown-content')) closeDropdown(opened.input);
     return !!ok;
   }
 
@@ -265,7 +267,10 @@
       return el && !el.value;
     };
     if (v.brand && empty('brand-select-dropdown-input')) done.brand = await selectBrand(v.brand);
-    if (empty('category-size-single-grid-input')) done.size = await selectSize(v.sizeCandidates);
+    // No size readable on the photos: leave it to the user (not a failure)
+    if (Array.isArray(v.sizeCandidates) && v.sizeCandidates.length && empty('category-size-single-grid-input')) {
+      done.size = await selectSize(v.sizeCandidates);
+    }
     if (empty('category-condition-single-list-input')) done.condition = await selectCondition(v.statusId);
     if (Array.isArray(v.colorIds) && v.colorIds.length && empty('color-select-dropdown-input')) {
       done.colors = await selectMulti('color-select-dropdown-input', 'color-select-dropdown-content', 'color', v.colorIds, 2);

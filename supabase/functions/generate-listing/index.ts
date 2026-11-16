@@ -19,6 +19,11 @@ interface ListingData {
   additionalInfo: string;
   platform?: string;
   quantity?: number;
+  brand?: string;
+  size?: string;
+  color?: string;
+  material?: string;
+  conditionNote?: string;
 }
 
 // OPTIMIZED Dutch platform prompts - SHORT & CLEAN
@@ -287,38 +292,39 @@ Authentic vintage denim, classic fit. No damage.
 Fast shipping 1-2 days.`
 };
 
-// General description prompts - SHORT
-const highConvertingDescriptionNL = `Je bent een marketplace copywriter. Genereer KORTE productbeschrijvingen.
+// Beschrijving zoals een ervaren Vinted-verkoper hem schrijft (voorstel 8c: niet meer max 150 tekens)
+const highConvertingDescriptionNL = `Je schrijft Vinted-beschrijvingen zoals een ervaren verkoper: eerlijk, duidelijk en prettig om te lezen.
 
-STRUCTUUR:
-1. Hook (max 10 woorden)
-2. Beschrijving (2-3 zinnen)
-3. Specs (2-4 bullets met -)
-4. CTA: "Interesse? Stuur een berichtje!"
+OPBOUW
+1. Eén of twee zinnen over wat het is: merk, soort artikel, model, kleur, pasvorm of stijl.
+2. Een korte lijst met streepjes (-): merk, maat, kleur, materiaal en staat. Alleen wat gegeven is.
+3. Staat: noem een gebrek als het gegeven is. Is er geen gebrek gegeven, schrijf dan kort dat het netjes is, zonder te overdrijven.
+4. Sluit af met: "Vragen of meer foto's? Stuur gerust een berichtje."
 
-STRIKTE REGELS:
-- MAX 150 tekens
-- GEEN markdown (geen **, geen __)
-- GEEN em dash - gebruik gewoon streepje (-)
-- GEEN prijs
-- VERZIN GEEN INFO - alleen wat gegeven is`;
+REGELS
+- 250 tot 600 tekens.
+- In het Nederlands, in de ik-vorm van de verkoper.
+- Geen markdown, geen emoji's, geen hashtags, geen em dash.
+- Geen prijs.
+- Verzin niets: geen maten, materialen, merken, afmetingen of gebreken die niet gegeven zijn.
+- Geen holle woorden als "prachtig", "perfect" of "must-have".`;
 
-const highConvertingDescriptionEN = `You are a marketplace copywriter. Generate SHORT product descriptions.
+const highConvertingDescriptionEN = `You write Vinted descriptions like an experienced seller: honest, clear and pleasant to read.
 
-STRUCTURE:
-1. Hook (max 10 words)
-2. Description (2-3 sentences)
-3. Specs (2-4 bullets with -)
-4. CTA: "Interested? Message me!"
+STRUCTURE
+1. One or two sentences about what it is: brand, type of item, model, colour, fit or style.
+2. A short list with hyphens (-): brand, size, colour, material and condition. Only what is given.
+3. Condition: mention a flaw if one is given. If no flaw is given, say briefly that it is in good shape, without exaggerating.
+4. End with: "Questions or more photos? Feel free to send me a message."
 
-STRICT RULES:
-- MAX 150 characters
-- NO markdown (no **, no __)
-- NO em dash - use regular hyphen (-)
-- NO price
-- DO NOT INVENT INFO - only use what's provided`;
+RULES
+- 250 to 600 characters.
+- In English, written by the seller in the first person.
+- No markdown, no emojis, no hashtags, no em dash.
+- No price.
+- Do not invent anything: no sizes, materials, brands, measurements or flaws that are not given.
+- No empty words like "stunning", "perfect" or "must-have".`;
 
-// Title optimization prompt - STRICT
 const titlePromptNL = `Genereer een KORTE titel.
 
 STRIKTE REGELS:
@@ -358,29 +364,40 @@ function buildPrompts(action: string, listing: unknown, platform: string | undef
   if (action === 'generate_description') {
     systemPrompt = isEnglish ? highConvertingDescriptionEN : highConvertingDescriptionNL;
 
-    const conditionText = isEnglish ? getConditionEN(listingData.condition) : listingData.condition;
-    
-    // Build a cleaner prompt with only available data
+    const conditionText = isEnglish ? getConditionEN(listingData.condition) : getConditionNL(listingData.condition);
+    const L = isEnglish
+      ? { product: "Product", category: "Category", brand: "Brand", size: "Size", color: "Colour", material: "Material", condition: "Condition", flaw: "Visible flaw (from the photos)", qty: "Quantity", tags: "Search words", extra: "Extra info", notes: "Seller notes" }
+      : { product: "Product", category: "Categorie", brand: "Merk", size: "Maat", color: "Kleur", material: "Materiaal", condition: "Staat", flaw: "Zichtbaar gebrek (van de foto's)", qty: "Aantal", tags: "Zoekwoorden", extra: "Extra info", notes: "Notities van de verkoper" };
+
+    // Alleen gegevens die er echt zijn
     const dataPoints: string[] = [];
-    if (listingData.title) dataPoints.push(`Product: ${listingData.title}`);
-    if (listingData.category) dataPoints.push(`Categorie: ${listingData.category}`);
-    if (conditionText) dataPoints.push(`Conditie: ${conditionText}`);
-    if (listingData.quantity && listingData.quantity > 1) dataPoints.push(`Quantity: ${listingData.quantity} (use PLURAL forms!)`);
-    if (listingData.tags) dataPoints.push(`Tags: ${listingData.tags}`);
-    if (listingData.additionalInfo) dataPoints.push(`Extra info: ${listingData.additionalInfo}`);
-    if (listingData.template) dataPoints.push(`Notities: ${listingData.template}`);
-    
+    if (listingData.title) dataPoints.push(`${L.product}: ${listingData.title}`);
+    if (listingData.category) dataPoints.push(`${L.category}: ${listingData.category}`);
+    if (listingData.brand) dataPoints.push(`${L.brand}: ${listingData.brand}`);
+    if (listingData.size) dataPoints.push(`${L.size}: ${listingData.size}`);
+    if (listingData.color) dataPoints.push(`${L.color}: ${listingData.color}`);
+    if (listingData.material) dataPoints.push(`${L.material}: ${listingData.material}`);
+    if (conditionText) dataPoints.push(`${L.condition}: ${conditionText}`);
+    const note = (listingData.conditionNote || "").trim();
+    const isNew = listingData.condition === "nieuw" || listingData.condition === "nieuw_zonder";
+    const noFlaw = /^\s*(no|none|geen)\b|no (visible )?(flaws?|damage|defects?|wear)/i.test(note);
+    if (note && !isNew && !noFlaw) dataPoints.push(`${L.flaw}: ${note}`);
+    if (listingData.quantity && listingData.quantity > 1) dataPoints.push(`${L.qty}: ${listingData.quantity} (${isEnglish ? "use plural forms" : "gebruik meervoud"})`);
+    if (listingData.tags) dataPoints.push(`${L.tags}: ${listingData.tags}`);
+    if (listingData.additionalInfo) dataPoints.push(`${L.extra}: ${listingData.additionalInfo}`);
+    if (listingData.template) dataPoints.push(`${L.notes}: ${listingData.template}`);
+
     userPrompt = isEnglish
-      ? `Generate SHORT description (max 150 chars, NO markdown, NO em dash):
+      ? `Write the description (250-600 characters) from these details:
 
 ${dataPoints.join('\n')}
 
 OUTPUT ONLY THE DESCRIPTION:`
-      : `Genereer KORTE beschrijving (max 150 tekens, GEEN markdown, GEEN em dash):
+      : `Schrijf de beschrijving (250-600 tekens) met deze gegevens:
 
 ${dataPoints.join('\n')}
 
-OUTPUT ALLEEN DE BESCHRIJVING:`;
+GEEF ALLEEN DE BESCHRIJVING:`;
 
   } else if (action === 'format_for_platform' && platform) {
     const prompts = isEnglish ? platformPromptsEN : platformPromptsNL;
@@ -437,6 +454,7 @@ const VALID_LANGUAGES = ["nl", "en"];
 const FIELD_LIMITS: Record<string, number> = {
   title: 200, price: 20, category: 200, condition: 50,
   tags: 500, template: 2000, additionalInfo: 5000, platform: 20,
+  brand: 100, size: 100, color: 100, material: 200, conditionNote: 300,
 };
 
 function cleanText(text: string): string {
@@ -542,13 +560,24 @@ Deno.serve(async (req) => {
 });
 
 // Helper to translate Dutch condition to English
+function getConditionNL(condition: string): string {
+  const map: Record<string, string> = {
+    'nieuw': 'Nieuw met labels',
+    'nieuw_zonder': 'Nieuw zonder labels',
+    'zeer_goed': 'Zeer goed',
+    'goed': 'Goed',
+    'redelijk': 'Redelijk'
+  };
+  return map[condition] || condition;
+}
+
 function getConditionEN(condition: string): string {
   const map: Record<string, string> = {
     'nieuw': 'New with tags',
     'nieuw_zonder': 'New without tags',
     'zeer_goed': 'Very good',
     'goed': 'Good',
-    'redelijk': 'Fair'
+    'redelijk': 'Satisfactory'
   };
   return map[condition] || condition;
 }

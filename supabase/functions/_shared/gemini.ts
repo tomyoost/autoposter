@@ -39,6 +39,7 @@ export async function callGemini(
     ? opts.effort
     : await getSetting<string | null>(purpose === "category" ? "ai_reasoning_effort_category" : "ai_reasoning_effort", purpose === "category" ? "low" : "medium");
   let lastError: GeminiResult = { ok: false, status: 500, code: "AI_ERROR", detail: "no model tried" };
+  let sawRateLimit = false;
 
   const models = opts.models && opts.models.length > 0 ? opts.models : await modelsFor(purpose);
   for (const [index, model] of models.entries()) {
@@ -61,7 +62,7 @@ export async function callGemini(
           body: JSON.stringify(body),
           // Met een reservemodel achter de hand: niet langer dan 22 s wachten en 12 s overlaten voor de reserve
           signal: AbortSignal.timeout(
-            hasReserve ? Math.max(8_000, Math.min(22_000, remaining - 12_000)) : Math.min(35_000, remaining - 500),
+            Math.min(remaining - 500, hasReserve ? Math.max(8_000, Math.min(22_000, remaining - 12_000)) : 35_000),
           ),
         });
       } catch (e) {
@@ -81,6 +82,7 @@ export async function callGemini(
         // Limiet van dit model bereikt (bijv. de gratis versie): het reservemodel heeft een eigen limiet
         console.warn(`Gemini ${model} limiet bereikt (429), probeer het reservemodel`);
         lastError = { ok: false, status: 429, code: "AI_RATE_LIMIT", detail: text };
+        sawRateLimit = true;
         break;
       }
       if (res.status === 402) return { ok: false, status: 402, code: "AI_NO_CREDITS", detail: text };
@@ -92,6 +94,10 @@ export async function callGemini(
       lastError = { ok: false, status: 500, code: "AI_ERROR", detail: `${model}: ${res.status}` };
       break; // model bestaat niet, is uitgefaseerd of gaf een serverfout: probeer het reservemodel
     }
+  }
+  // Gaf een model een limiet (429) en faalde de reserve ook: meld de limiet, dan probeert de aanroeper niet de hele keten opnieuw
+  if (sawRateLimit && lastError.ok === false && lastError.code === "AI_ERROR") {
+    return { ok: false, status: 429, code: "AI_RATE_LIMIT", detail: lastError.detail };
   }
   return lastError;
 }

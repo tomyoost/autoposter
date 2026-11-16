@@ -330,16 +330,19 @@ Deno.serve(async (req) => {
     const s1Ms = Date.now() - started;
 
     // ---------- Stap 2: de exacte categorie uit de echte Vinted-lijst ----------
-    const rootIds = strList(s1.topLevelIds, 2, 12)
-      .map((x) => parseInt(x, 10))
-      .filter((id) => tree.roots.includes(id));
-    if (rootIds.length === 0) rootIds.push(...tree.roots); // onbekend: alles
-    const { lines, ids: candidateIds } = leafLines(tree, rootIds);
+    // Hoofdcategorieën uit stap 1: id's, of (soms) namen
+    const rootByName = new Map(tree.roots.map((id) => [tree.byId.get(id)!.title.toLowerCase(), id]));
+    const rootIds = [...new Set(strList(s1.topLevelIds, 2, 40)
+      .map((x) => /^\d+$/.test(x) ? parseInt(x, 10) : rootByName.get(x.toLowerCase()) ?? NaN)
+      .filter((id) => tree.roots.includes(id)))];
+    // Onbekend: geen AI over de hele boom (te groot en traag), maar de noodkeuze over alle eindcategorieën
+    const skipAiChoice = rootIds.length === 0;
+    const { lines, ids: candidateIds } = leafLines(tree, skipAiChoice ? tree.roots : rootIds);
     const guess = [str(s1.categoryGuess), str(s1.itemType)].filter(Boolean).join(" | ");
 
     let catalogId: number | null = null;
     let s2Model = "";
-    if (candidateIds.size > 0 && deadline - Date.now() > 4_000) {
+    if (!skipAiChoice && candidateIds.size > 0 && deadline - Date.now() > 4_000) {
       const item = {
         itemType: str(s1.itemType),
         targetGroup: str(s1.targetGroup),

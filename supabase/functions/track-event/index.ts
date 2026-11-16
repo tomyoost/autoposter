@@ -25,6 +25,8 @@ const VALID_EVENTS = [
   'onboarding_completed',
   'onboarding_skipped',
   'error_occurred',
+  'paste_completed',
+  'license_activated',
 ];
 
 serve(async (req) => {

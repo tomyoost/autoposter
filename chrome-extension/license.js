@@ -1,8 +1,19 @@
 // Autoposter - License Activation (first screen)
 // Needs config.js, i18n.js and license-api.js loaded first.
 
+// Welcome mode: this page opened in a tab right after installing (background.js)
+const PARAMS = new URLSearchParams(location.search);
+const WELCOME = PARAMS.get('welcome') === '1';
+const FROM_OLD_VERSION = PARAMS.get('update') === '1';
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  if (WELCOME) {
+    document.body.classList.add('welcome-mode');
+    document.getElementById('welcome').hidden = false;
+    document.getElementById('welcomeUpdate').hidden = !FROM_OLD_VERSION;
+  }
+
   // Load i18n
   await window.i18n.loadLanguage();
   
@@ -91,8 +102,9 @@ async function checkExistingLicense() {
   const result = await chrome.storage.local.get(['licenseValidated', 'licenseKey']);
   
   if (result.licenseValidated && result.licenseKey) {
-    // Already has valid license, redirect to popup
-    window.location.href = 'popup.html';
+    // Already has a valid license: in the welcome tab say it is ready, in the popup go to the main screen
+    if (WELCOME && !FROM_OLD_VERSION) showWelcomeDone();
+    else if (!WELCOME) window.location.href = 'popup.html';
   }
 }
 
@@ -134,11 +146,17 @@ async function handleActivation() {
       
       // Show onboarding for new users
       await chrome.storage.local.set({ showOnboarding: true });
+      if (typeof trackEvent === 'function') trackEvent('license_activated', { welcome: WELCOME });
       
-      // Redirect after short delay
-      setTimeout(() => {
-        window.location.href = 'popup.html';
-      }, 1000);
+      if (WELCOME) {
+        // Welcome tab: the popup opens from the toolbar icon, so explain that instead of loading the popup here
+        showWelcomeDone();
+      } else {
+        // Redirect after short delay
+        setTimeout(() => {
+          window.location.href = 'popup.html';
+        }, 1000);
+      }
     } else {
       input.classList.add('error');
       errorEl.textContent = licenseErrorMessage(activation.result, t);
@@ -152,4 +170,12 @@ async function handleActivation() {
     btn.disabled = false;
     btnText.textContent = t('licenseActivate');
   }
+}
+
+function showWelcomeDone() {
+  document.getElementById('welcome').hidden = true;
+  document.getElementById('keyGroup').hidden = true;
+  document.getElementById('activateBtn').hidden = true;
+  document.getElementById('subtitle').hidden = true;
+  document.getElementById('welcomeDone').hidden = false;
 }

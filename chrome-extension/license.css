@@ -241,3 +241,65 @@ body[data-theme="light"] .logo img {
   color: var(--success);
   margin-left: 4px;
 }
+
+/* Welcome page (opened in a full tab after installing) */
+body.welcome-mode {
+  width: auto;
+  min-height: 100vh;
+}
+body.welcome-mode .license-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+[hidden] {
+  display: none !important;
+}
+.welcome h2 {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+.welcome-intro,
+.welcome-update {
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.welcome-update {
+  color: var(--text-primary);
+  background: var(--primary-light);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.welcome-steps {
+  margin: 0 0 24px 22px;
+  line-height: 1.5;
+  text-align: left;
+}
+.welcome-steps li {
+  margin-bottom: 14px;
+}
+.welcome-steps .btn-free {
+  display: block;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+.welcome-steps .btn-free:hover {
+  background: var(--primary-hover);
+}
+.welcome-done {
+  font-size: 18px;
+  line-height: 1.5;
+  padding: 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(16, 185, 129, 0.12);
+  margin: 8px 0 16px;
+}
+body.welcome-mode #subtitle {
+  display: none;
+}

@@ -1,10 +1,23 @@
 // Autoposter - Background Service Worker
 // Manifest V3 compatible
 
+// AP_CONFIG and trackEvent (classic service worker: importScripts shares one global scope)
+importScripts('config.js', 'analytics.js');
+
+// Welcome page in a tab: after installing, and for users coming from 1.0.x (their old key no longer works)
+function openWelcomePage(isUpdate) {
+  const url = chrome.runtime.getURL(`license.html?welcome=1${isUpdate ? '&update=1' : ''}`);
+  // Right at browser start there may be no window yet: try again a moment later
+  chrome.tabs.create({ url }).catch(() => {
+    setTimeout(() => chrome.tabs.create({ url }).catch(() => {}), 2000);
+  });
+}
+
 // Listen for installation
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    console.log('Autoposter installed successfully!');
+    trackEvent('extension_installed');
+    openWelcomePage(false);
     
     // Set default settings
     chrome.storage.local.set({
@@ -14,15 +27,20 @@ chrome.runtime.onInstalled.addListener((details) => {
       }
     });
   } else if (details.reason === 'update') {
-    console.log('Autoposter updated to version:', chrome.runtime.getManifest().version);
+    if (/^1\.0\./.test(details.previousVersion || '')) openWelcomePage(true);
   }
 });
 
 // Handle messages from popup or content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('Message received:', request.action);
   
   switch (request.action) {
+    case 'trackEvent':
+      // From the content script on Vinted (only event names and counts)
+      if (typeof request.event === 'string') trackEvent(request.event, request.extra || {});
+      sendResponse({ ok: true });
+      return false;
+
     case 'getCurrentTab':
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         sendResponse({ tab: tabs[0] });
@@ -55,4 +73,3 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false;
 });
 
-console.log('Autoposter background service worker started');

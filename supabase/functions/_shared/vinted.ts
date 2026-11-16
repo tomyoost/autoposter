@@ -136,7 +136,7 @@ export function leafLines(tree: CatalogTree, rootIds: number[]): { lines: string
 }
 
 function words(s: string): string[] {
-  return s.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N} ]+/gu, " ").split(/\s+/).filter((w) => w.length > 2);
+  return s.toLowerCase().normalize("NFKD").replace(/\p{M}+/gu, "").replace(/[^\p{L}\p{N} ]+/gu, " ").split(/\s+/).filter((w) => w.length > 2);
 }
 
 /** Noodoplossing als de tweede AI-stap faalt: de eindcategorie waarvan het pad het meest lijkt op de gok. */
