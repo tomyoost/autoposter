@@ -56,7 +56,7 @@ const Index = () => {
               <a href="#prijzen">Bekijk de prijzen</a>
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-4">Gratis te proberen: 3 AI-analyses per maand.</p>
+          <p className="text-sm text-muted-foreground mt-4">Gratis te proberen: 5 AI-analyses per maand.</p>
         </div>
       </section>
 
@@ -163,7 +163,7 @@ const Index = () => {
             Probeer het gratis
           </h2>
           <p className="text-muted-foreground mb-8">
-            Met de gratis versie krijg je 3 AI-analyses per maand. Je sleutel haal je op via Gumroad.
+            Met de gratis versie krijg je 5 AI-analyses per maand. Je sleutel haal je op via Gumroad.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <InstallButton size="lg" />
