@@ -35,6 +35,14 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   switch (request.action) {
+    // DEV-RELOAD-BEGIN (alleen de uitgepakte ontwikkelversie; de bouwstap haalt dit blok uit de zip voor de Web Store)
+    case 'devReload':
+      chrome.management.getSelf((self) => {
+        if (self && self.installType === 'development') chrome.runtime.reload();
+      });
+      return false;
+    // DEV-RELOAD-END
+
     case 'trackEvent':
       // From the content script on Vinted (only event names and counts)
       if (typeof request.event === 'string') trackEvent(request.event, request.extra || {});

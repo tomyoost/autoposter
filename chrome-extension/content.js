@@ -2670,6 +2670,15 @@ function init() {
 
 init();
 
+// DEV-RELOAD-BEGIN (alleen de uitgepakte ontwikkelversie; de bouwstap haalt dit blok uit de zip voor de Web Store)
+// Laat de CTO de extensie na een nieuwe testversie herladen vanaf de Vinted-pagina, zonder klik van Tomy.
+// De achtergrond herlaadt alleen als dit een uitgepakte extensie is (installType "development").
+window.addEventListener('message', (event) => {
+  if (event.source !== window || !event.data || event.data.autoposterDev !== 'reload') return;
+  try { chrome.runtime.sendMessage({ action: 'devReload' }); } catch (_) { /* oude pagina na herladen */ }
+});
+// DEV-RELOAD-END
+
 // Listen for language changes
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes.language) {
