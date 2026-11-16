@@ -110,8 +110,8 @@ const Index = () => {
             />
             <BenefitItem
               icon={<Globe className="w-5 h-5 text-primary" />}
-              title="Tien Vinted-landen"
-              description="Werkt op vinted.nl, .be, .de, .fr, .es, .it, .pl, .pt, .com en .co.uk."
+              title="Het best in Nederland en België"
+              description="Werkt het best in Nederland en België. In andere Vinted-landen schrijft de AI in het Engels."
             />
             <BenefitItem
               icon={<Lock className="w-5 h-5 text-primary" />}
