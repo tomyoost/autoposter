@@ -41,7 +41,8 @@ export async function callGemini(
   let lastError: GeminiResult = { ok: false, status: 500, code: "AI_ERROR", detail: "no model tried" };
 
   const models = opts.models && opts.models.length > 0 ? opts.models : await modelsFor(purpose);
-  for (const model of models) {
+  for (const [index, model] of models.entries()) {
+    const hasReserve = index < models.length - 1;
     let withEffort = typeof effort === "string" && effort.length > 0;
     for (let attempt = 0; attempt < 2; attempt++) {
       const remaining = deadline - Date.now();
@@ -58,7 +59,10 @@ export async function callGemini(
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(Math.min(35_000, remaining - 500)),
+          // Met een reservemodel achter de hand: niet langer dan 22 s wachten en 12 s overlaten voor de reserve
+          signal: AbortSignal.timeout(
+            hasReserve ? Math.max(8_000, Math.min(22_000, remaining - 12_000)) : Math.min(35_000, remaining - 500),
+          ),
         });
       } catch (e) {
         const detail = e instanceof Error ? e.message : String(e);
@@ -73,7 +77,12 @@ export async function callGemini(
       }
 
       const text = (await res.text()).slice(0, 500);
-      if (res.status === 429) return { ok: false, status: 429, code: "AI_RATE_LIMIT", detail: text };
+      if (res.status === 429) {
+        // Limiet van dit model bereikt (bijv. de gratis versie): het reservemodel heeft een eigen limiet
+        console.warn(`Gemini ${model} limiet bereikt (429), probeer het reservemodel`);
+        lastError = { ok: false, status: 429, code: "AI_RATE_LIMIT", detail: text };
+        break;
+      }
       if (res.status === 402) return { ok: false, status: 402, code: "AI_NO_CREDITS", detail: text };
       if (res.status === 400 && withEffort && /reasoning|thinking/i.test(text)) {
         withEffort = false; // dit model kent de denkinstelling niet: opnieuw zonder

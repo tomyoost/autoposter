@@ -80,7 +80,7 @@ const Index = () => {
             <FeatureCard
               icon={<LayoutTemplate className="w-6 h-6" />}
               title="Prijs en sjablonen"
-              description="De prijs vul je zelf in. Met je eigen sjablonen voor de beschrijving werk je elke keer op dezelfde manier."
+              description="De AI stelt een prijs voor die je zelf aanpast. Met je eigen sjablonen voor de beschrijving werk je elke keer op dezelfde manier."
             />
             <FeatureCard
               icon={<ClipboardPaste className="w-6 h-6" />}

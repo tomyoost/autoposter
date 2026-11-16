@@ -1740,6 +1740,18 @@ function applyAnalysisResults(analysis) {
     }
   }
 
+  // Price: the AI's suggestion as a starting point, only when the seller has not typed a price yet
+  const suggested = Number(analysis.suggestedPrice);
+  if (Number.isFinite(suggested) && suggested > 0) {
+    const priceInput = document.getElementById('price');
+    if (priceInput && !priceInput.value.trim()) {
+      const rounded = suggested >= 10 ? Math.round(suggested) : Math.max(1, Math.round(suggested * 2) / 2);
+      priceInput.value = String(rounded);
+      highlightField(priceInput);
+      fieldsUpdated.push('prijs');
+    }
+  }
+
   // Tags
   if (analysis.suggestedTags && analysis.suggestedTags.length > 0) {
     const tagsInput = document.getElementById('tags');
