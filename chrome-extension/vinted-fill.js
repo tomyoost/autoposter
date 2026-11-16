@@ -44,12 +44,41 @@
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  /**
+   * Volledige muisklik (pointerdown, mousedown, pointerup, mouseup, click).
+   * Vinted (17-11-2026): de keuzevakken zijn knoppen geworden die niet op alleen click() reageren.
+   */
+  function realClick(el) {
+    if (!el) return false;
+    const mouse = { bubbles: true, cancelable: true, button: 0 };
+    const pointer = { ...mouse, pointerType: 'mouse', isPrimary: true };
+    el.dispatchEvent(new PointerEvent('pointerdown', pointer));
+    el.dispatchEvent(new MouseEvent('mousedown', mouse));
+    el.dispatchEvent(new PointerEvent('pointerup', pointer));
+    el.dispatchEvent(new MouseEvent('mouseup', mouse));
+    el.dispatchEvent(new MouseEvent('click', mouse));
+    return true;
+  }
+
+  /**
+   * Wat er in een keuzevak staat. Oud: een invulveld met .value. Nieuw (17-11-2026): een knop met de tekst in
+   * "<testid>--value"; een leeg vak heeft dan het kenmerk data-placeholder (de tekst is dan "Kies een maat" e.d.).
+   */
+  function fieldValue(el) {
+    if (!el) return '';
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return el.value || '';
+    if (el.hasAttribute('data-placeholder')) return '';
+    const testId = el.getAttribute('data-testid');
+    const valueEl = testId ? (el.querySelector(`[data-testid="${testId}--value"]`) || byTestId(`${testId}--value`)) : null;
+    return ((valueEl || el).textContent || '').trim();
+  }
+
   /** Klikt op de rij waar een radio/checkbox in zit (zo reageert Vinted's lijst). */
   function clickRow(inner) {
     if (!inner) return false;
     const row = inner.closest('li') || inner.closest('[role="button"]') || inner.parentElement;
     const target = (row && (row.querySelector('.web_ui__Cell__cell') || row.firstElementChild)) || row || inner;
-    target.click();
+    realClick(target);
     return true;
   }
 
@@ -62,7 +91,11 @@
     if (!input) return null;
     if (!byTestId(contentTestId)) {
       input.scrollIntoView({ block: 'center' });
-      input.click();
+      // Knop (nieuw): volledige muisklik. Invulveld (oud): gewone klik. Lukt de ene niet, probeer de andere.
+      if (input.tagName === 'BUTTON') realClick(input); else input.click();
+      if (!(await waitFor(() => byTestId(contentTestId), 1200))) {
+        if (input.tagName === 'BUTTON') input.click(); else realClick(input);
+      }
     }
     const content = await waitFor(() => byTestId(contentTestId), 3000);
     return content ? { input, content } : null;
@@ -132,7 +165,7 @@
     }
     clickRow(radio);
     // Only a success if exactly this category is in the field (not Vinted's own suggestion from the title)
-    const ok = await waitFor(() => !byTestId('catalog-select-dropdown-content') && norm(opened.input.value) === norm(node[2]), 3000);
+    const ok = await waitFor(() => !byTestId('catalog-select-dropdown-content') && norm(fieldValue(opened.input)) === norm(node[2]), 3000);
     if (!ok && byTestId('catalog-select-dropdown-content')) closeDropdown(opened.input);
     return !!ok;
   }
@@ -174,10 +207,10 @@
         if (!custom) break;
         clickRow(custom); // "Gebruik ... als merk"
       }
-      if (await waitFor(() => opened.input.value, 1500)) break;
+      if (await waitFor(() => fieldValue(opened.input), 1500)) break;
       await sleep(600); // lijst was nog in beweging: nog één keer
     }
-    const ok = !!opened.input.value;
+    const ok = !!fieldValue(opened.input);
     if (byTestId('brand-select-dropdown-content')) closeDropdown(opened.input);
     return ok;
   }
@@ -199,8 +232,8 @@
       if (!want) continue;
       const hit = options.find((el) => sizeTokens(el.innerText).has(want));
       if (hit) {
-        hit.click();
-        const ok = await waitFor(() => opened.input.value, 2000);
+        realClick(hit);
+        const ok = await waitFor(() => fieldValue(opened.input), 2000);
         if (byTestId('category-size-single-grid-content')) closeDropdown(opened.input);
         return !!ok;
       }
@@ -218,8 +251,8 @@
       closeDropdown(opened.input);
       return false;
     }
-    cell.click();
-    const ok = await waitFor(() => opened.input.value, 2000);
+    realClick(cell);
+    const ok = await waitFor(() => fieldValue(opened.input), 2000);
     if (byTestId('category-condition-single-list-content')) closeDropdown(opened.input);
     return !!ok;
   }
@@ -237,13 +270,13 @@
         picked++;
         continue;
       }
-      opt.click();
+      realClick(opt);
       picked++;
       await sleep(250);
     }
     closeDropdown(opened.input);
     await sleep(250);
-    return picked > 0 && !!opened.input.value;
+    return picked > 0 && !!fieldValue(opened.input);
   }
 
   /**
@@ -264,7 +297,7 @@
 
     const empty = (testId) => {
       const el = byTestId(testId);
-      return el && !el.value;
+      return el && !fieldValue(el);
     };
     if (v.brand && empty('brand-select-dropdown-input')) done.brand = await selectBrand(v.brand);
     // No size readable on the photos: leave it to the user (not a failure)
@@ -282,7 +315,12 @@
     return done;
   }
 
-  window.AutoposterVinted = { refreshCatalog, fillVintedFields, selectCategory };
+  /** Staat er een categorie in het formulier (van ons of Vinted's eigen voorstel)? */
+  function hasCategory() {
+    return !!fieldValue(byTestId('catalog-select-dropdown-input'));
+  }
+
+  window.AutoposterVinted = { refreshCatalog, fillVintedFields, selectCategory, hasCategory };
 
   // Boom alvast ophalen, zodat de volgende analyse in de popup de eigen lijst van de gebruiker gebruikt.
   setTimeout(() => { refreshCatalog(); }, 2500);

@@ -2465,7 +2465,10 @@ async function handlePaste() {
         categoryOk = await selectVintedCategory(data.lastCategoryPath);
       }
       results.push({ success: !!categoryOk, fieldName: t('category'), key: 'category' });
-      if (categoryOk) {
+      // Ook als onze keuze mislukte maar er wel een categorie staat (bijv. Vinted's eigen voorstel):
+      // dan staan merk, maat, staat, kleur en materiaal er, dus vullen we die toch in.
+      const categoryPresent = categoryOk || (typeof filler.hasCategory === 'function' && filler.hasCategory());
+      if (categoryPresent) {
         showNotification(`⏳ ${t('stepDetails')}`, 'info', 2500);
         const done = await filler.fillVintedFields(vinted, { category: false });
         for (const [key, ok] of Object.entries(done)) {
