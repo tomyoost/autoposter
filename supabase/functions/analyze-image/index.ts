@@ -58,7 +58,7 @@ interface Stage1 {
   sizeAudience?: string;
   childEvidence?: string;
   garmentGender?: string;
-  usualDepartment?: string;
+  itemClass?: string;
 }
 
 const TARGET_GROUPS = ["women", "men", "unisex_adult", "girls", "boys", "baby", "kids_unisex", "not_fashion"];
@@ -68,6 +68,10 @@ const LABEL_AUDIENCES = ["women", "men", "girls", "boys", "kids", "baby", "none"
 const SIZE_AUDIENCES = ["adult", "kids", "baby", "none"];
 const CHILD_EVIDENCE = ["worn_by_child", "child_size_mannequin", "kids_design", "none"];
 const GARMENT_GENDERS = ["women_only", "womens_cut", "mens_cut", "neutral"];
+const ITEM_CLASSES = ["tops", "shirts", "blouses", "knitwear", "sweatshirts", "jackets", "trousers", "dresses", "suits", "swimwear", "underwear", "shoes", "bags", "accessories", "other"];
+// Vaste tabel voor kleding die iedereen kan dragen (en niets anders beslist): zo wisselt de afdeling niet per keer.
+// Wie vooral voor één afdeling verkoopt, zet "Voor wie" in de popup; die keuze gaat hiervoor.
+const NEUTRAL_MEN = new Set(["tops", "shirts", "sweatshirts", "jackets", "trousers", "suits"]);
 // Vinted-id's (gelijk in elke taal): Dames, Heren, Kinderen > Meisjeskleding, Kinderen > Jongenskleding
 const FASHION_ROOTS = [1904, 5, 1193];
 type AudienceGroup = "women" | "men" | "girls" | "boys";
@@ -132,10 +136,10 @@ const stage1ToolV2 = (() => {
     labelAudience: { type: "string", enum: LABEL_AUDIENCES, description: "Who printed text on a label, tag or packaging SAYS the item is for, in any language: Women/Dames/Femme/Damen, Men/Heren/Homme/Herren, Girls/Meisjes, Boys/Jongens, Kids/Kinder/Enfant, Baby. none if no such text is visible." },
     sizeAudience: { type: "string", enum: SIZE_AUDIENCES, description: "What the printed size implies: kids for children's heights (92-176 cm, e.g. 104, 128, 152) or ages (2-16 years, 4Y, 6 jaar, 8 ans); baby for 50-86 cm or months; adult for XS-XXL, adult EU sizes, W/L sizes and shoe sizes 35 and up; none if no size is readable." },
     childEvidence: { type: "string", enum: CHILD_EVIDENCE, description: "Visible proof that this is a child's item: worn by a child; shown on a child-size dress form or mannequin (small head, narrow shoulders, short torso); an unmistakable kids design (nursery or cartoon print, school uniform). none if the photos do not clearly show this. An item lying flat or on a hanger has no scale: then none." },
-    garmentGender: { type: "string", enum: GARMENT_GENDERS, description: "women_only: dresses, skirts, bras and lingerie, heels, handbags, clearly feminine blouses. womens_cut: a fitted women's cut, darts, buttons on the wearer's left side. mens_cut: men's tailoring or a typical men's style, shirt or jacket buttons on the wearer's right side. neutral: anyone could wear it (t-shirts, hoodies, sneakers, most boots, most jackets, backpacks)." },
-    usualDepartment: { type: "string", enum: ["women", "men"], description: "Where most Vinted sellers list this exact kind of item. Only used when nothing else decides it. Decide by the item type and cut alone, never by a team, club, sport, print or who might have owned it. When both are common, use this fixed rule: jackets, coats, track tops, sweatshirts, hoodies, t-shirts, shirts, jeans and trousers = men; dresses, skirts, blouses, cardigans, knitwear, bags, boots and heeled shoes = women. For a child's item: women = girls, men = boys." },
+    garmentGender: { type: "string", enum: GARMENT_GENDERS, description: "women_only: dresses, skirts, bras and lingerie, heels, handbags, clearly feminine blouses. womens_cut: a women's cut you can clearly see: fitted waist, darts, buttons on the wearer's left side. mens_cut: a men's cut you can clearly see: men's tailoring, shirt or jacket buttons on the wearer's right side. neutral: everything else, including all flat shoes, boots, sneakers and loafers, t-shirts, hoodies, sweatshirts, most jackets and backpacks. Never decide by style, brand or who usually buys it." },
+    itemClass: { type: "string", enum: ITEM_CLASSES, description: "What kind of item it is, by type only: tops (t-shirts, tank tops, polos), shirts (button shirts), blouses, knitwear (jumpers, cardigans), sweatshirts (sweatshirts, hoodies, track tops), jackets (jackets, coats, blazers, gilets), trousers (jeans, trousers, shorts), dresses (dresses, skirts), suits, swimwear, underwear (underwear, nightwear), shoes (all footwear), bags, accessories (belts, hats, scarves, jewellery, sunglasses), other." },
   });
-  p.required = [...p.required, "isWearable", "labelAudience", "sizeAudience", "childEvidence", "garmentGender", "usualDepartment", "suggestedPrice"];
+  p.required = [...p.required, "isWearable", "labelAudience", "sizeAudience", "childEvidence", "garmentGender", "itemClass", "suggestedPrice"];
   return t;
 })();
 
@@ -145,7 +149,7 @@ WHO IT IS FOR (this decides Women, Men or Kids on Vinted; be strict, the same ph
 - labelAudience: only from printed text on a label, tag or packaging.
 - sizeAudience: only from the size that is printed.
 - childEvidence: only when the photos clearly show it. A garment lying flat or on a hanger has no scale, so that alone is never proof.
-- garmentGender and usualDepartment: judge the item itself (type and cut), never a team, sport, print or slogan on it. Use the fixed rule in usualDepartment when both departments are common.
+- garmentGender and itemClass: judge the item itself (type and cut), never a team, sport, print or slogan on it. When anyone could wear it, say neutral: a fixed rule then decides.
 
 PRICE (replaces the price rule above)
 - The price this item usually sells for on Vinted in the Netherlands in this condition, not the new price.
@@ -184,6 +188,17 @@ function audienceFromSizeText(label: string): "kids" | "baby" | null {
   return null;
 }
 
+/** Unisex-kleding zonder ander bewijs: schoenmaat als die er is (43+ heren, 39- dames), anders de vaste tabel. */
+function neutralIsFemale(s1: Stage1): boolean {
+  const cls = ITEM_CLASSES.includes(String(s1.itemClass)) ? String(s1.itemClass) : "other";
+  if (cls === "shoes") {
+    const n = strList(s1.sizeCandidates, 4, 20).map((x) => parseFloat(x.replace(",", "."))).find((x) => x >= 34 && x <= 50);
+    if (n !== undefined && n >= 43) return false;
+    if (n !== undefined && n <= 39) return true;
+  }
+  return !NEUTRAL_MEN.has(cls);
+}
+
 /**
  * Dames, Heren, Meisjes of Jongens, met vaste voorrang: wat het label zegt, dan de maat, dan wat de foto
  * echt laat zien, dan de keuze van de verkoper in de popup, dan de snit, dan waar Vinted-verkopers het meestal zetten.
@@ -213,7 +228,7 @@ function decideAudience(s1: Stage1, choice: string): { group: AudienceGroup; rea
   else if (garment === "women_only") [female, genderWhy] = [true, "garment"];
   else if (!kids && (choice === "women" || choice === "men")) [female, genderWhy] = [choice === "women", "choice"];
   else if (garment === "womens_cut" || garment === "mens_cut") [female, genderWhy] = [garment === "womens_cut", "cut"];
-  else [female, genderWhy] = [s1.usualDepartment !== "men", "usual"];
+  else [female, genderWhy] = [neutralIsFemale(s1), "table"];
 
   const group: AudienceGroup = kids ? (female ? "girls" : "boys") : (female ? "women" : "men");
   return { group, reason: `${ageWhy}/${genderWhy}` };
