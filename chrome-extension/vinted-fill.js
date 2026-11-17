@@ -310,21 +310,28 @@
       }
     }
     let picked = 0;
+    // Na elk vinkje tekent Vinted de lijst opnieuw (gezien 17-11-2026): elke keer de lijst vers opzoeken,
+    // zo nodig opnieuw openen, en nakijken of het vinkje er echt staat.
     for (const id of ids.slice(0, max)) {
-      const opt = byTestId(`${prefix}-${id}`, opened.content);
-      if (!opt) continue;
-      const box = opt.closest('[aria-checked]') || opt.querySelector('[aria-checked]');
-      if (box && box.getAttribute('aria-checked') === 'true') {
-        picked++;
-        continue;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        let content = byTestId(contentId);
+        if (!content) {
+          const again = await openDropdown(inputId, contentId);
+          if (!again) break;
+          content = again.content;
+        }
+        const opt = byTestId(`${prefix}-${id}`, content);
+        if (!opt) break; // deze optie bestaat niet bij deze categorie
+        if (isChecked(opt)) { picked++; break; }
+        realClick(opt);
+        await sleep(350);
+        const check = byTestId(`${prefix}-${id}`, byTestId(contentId) || document);
+        if (check && isChecked(check)) { picked++; break; }
       }
-      realClick(opt);
-      picked++;
-      await sleep(250);
     }
-    closeDropdown(opened.input);
+    if (byTestId(contentId)) closeDropdown(byTestId(inputId) || opened.input);
     await sleep(250);
-    return picked > 0 && !!fieldValue(byTestId(opened.input.getAttribute('data-testid')) || opened.input);
+    return picked > 0 && !!fieldValue(byTestId(inputId) || opened.input);
   }
 
   const DETAIL_FIELDS = ['brand-select-dropdown-input', 'category-size-single-grid-input',
