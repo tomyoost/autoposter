@@ -133,7 +133,7 @@ const stage1ToolV2 = (() => {
     sizeAudience: { type: "string", enum: SIZE_AUDIENCES, description: "What the printed size implies: kids for children's heights (92-176 cm, e.g. 104, 128, 152) or ages (2-16 years, 4Y, 6 jaar, 8 ans); baby for 50-86 cm or months; adult for XS-XXL, adult EU sizes, W/L sizes and shoe sizes 35 and up; none if no size is readable." },
     childEvidence: { type: "string", enum: CHILD_EVIDENCE, description: "Visible proof that this is a child's item: worn by a child; shown on a child-size dress form or mannequin (small head, narrow shoulders, short torso); an unmistakable kids design (nursery or cartoon print, school uniform). none if the photos do not clearly show this. An item lying flat or on a hanger has no scale: then none." },
     garmentGender: { type: "string", enum: GARMENT_GENDERS, description: "women_only: dresses, skirts, bras and lingerie, heels, handbags, clearly feminine blouses. womens_cut: a fitted women's cut, darts, buttons on the wearer's left side. mens_cut: men's tailoring or a typical men's style, shirt or jacket buttons on the wearer's right side. neutral: anyone could wear it (t-shirts, hoodies, sneakers, most boots, most jackets, backpacks)." },
-    usualDepartment: { type: "string", enum: ["women", "men"], description: "Where most Vinted sellers list this exact kind of item. Only used when nothing else decides it. For a child's item: women = girls, men = boys." },
+    usualDepartment: { type: "string", enum: ["women", "men"], description: "Where most Vinted sellers list this exact kind of item. Only used when nothing else decides it. Decide by the item type and cut alone, never by a team, club, sport, print or who might have owned it. When both are common, use this fixed rule: jackets, coats, track tops, sweatshirts, hoodies, t-shirts, shirts, jeans and trousers = men; dresses, skirts, blouses, cardigans, knitwear, bags, boots and heeled shoes = women. For a child's item: women = girls, men = boys." },
   });
   p.required = [...p.required, "isWearable", "labelAudience", "sizeAudience", "childEvidence", "garmentGender", "usualDepartment", "suggestedPrice"];
   return t;
@@ -145,7 +145,7 @@ WHO IT IS FOR (this decides Women, Men or Kids on Vinted; be strict, the same ph
 - labelAudience: only from printed text on a label, tag or packaging.
 - sizeAudience: only from the size that is printed.
 - childEvidence: only when the photos clearly show it. A garment lying flat or on a hanger has no scale, so that alone is never proof.
-- garmentGender and usualDepartment: judge the item itself.
+- garmentGender and usualDepartment: judge the item itself (type and cut), never a team, sport, print or slogan on it. Use the fixed rule in usualDepartment when both departments are common.
 
 PRICE (replaces the price rule above)
 - The price this item usually sells for on Vinted in the Netherlands in this condition, not the new price.
