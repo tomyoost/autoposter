@@ -21,7 +21,15 @@
     return null;
   }
 
-  const byTestId = (id, root = document) => root.querySelector(`[data-testid="${id}"]`);
+  const byTestId = (id, root = document) => {
+    const exact = root.querySelector(`[data-testid="${id}"]`);
+    if (exact) return exact;
+    // Vinted heeft soms een variant van hetzelfde vak, bijvoorbeeld "category-size-single-grid_chips-input"
+    // (maatvak met keuzeknoppen S/M/L, EU, UK; gezien bij damesvesten, 17-11-2026). Opties heten hetzelfde.
+    const m = /^(.+)-(input|content)$/.exec(id);
+    if (!m || id.includes('--')) return null;
+    return root.querySelector(`[data-testid^="${m[1]}_"][data-testid$="-${m[2]}"]:not([data-testid*="--"])`);
+  };
 
   function norm(s) {
     return String(s || '')
@@ -324,7 +332,7 @@
 
   /** Welke vakken al een waarde hadden vóór het plakken (die heeft de gebruiker zelf gekozen). */
   function filledFields() {
-    return DETAIL_FIELDS.filter((t) => fieldValue(byTestId(t)));
+    return DETAIL_FIELDS.filter((t) => fieldValue(byTestId(t))); // basisnamen (ook als Vinted een variant toont)
   }
 
   /**
