@@ -93,6 +93,15 @@
           <input type="file" id="imageInput" accept="image/*" multiple hidden>
         </div>
         <div class="image-previews" id="imagePreviews"></div>
+        <div class="audience" id="audience">
+          <span class="audience-label" id="audienceLabel" data-i18n="audienceLabel">Voor wie</span>
+          <div class="audience-options" role="radiogroup" aria-labelledby="audienceLabel">
+            <button type="button" class="audience-btn" role="radio" aria-checked="true" data-audience="auto" data-i18n="audienceAuto">Automatisch</button>
+            <button type="button" class="audience-btn" role="radio" aria-checked="false" data-audience="women" data-i18n="audienceWomen">Dames</button>
+            <button type="button" class="audience-btn" role="radio" aria-checked="false" data-audience="men" data-i18n="audienceMen">Heren</button>
+            <button type="button" class="audience-btn" role="radio" aria-checked="false" data-audience="kids" data-i18n="audienceKids">Kinderen</button>
+          </div>
+        </div>
         <div class="photo-actions">
           <button type="button" id="analyzeImageBtn" class="btn btn-ai btn-block" disabled>
             <span data-i18n="analyzePhoto">Analyseer foto's met AI</span>

@@ -47,6 +47,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       chrome.management.getSelf(async (self) => {
         if (!self || self.installType !== 'development' || !Array.isArray(request.images) || !request.images.length) return;
         await chrome.storage.local.set({ devTestImages: request.images.slice(0, 10), devTestStatus: { state: 'queued', at: Date.now() } });
+        if (['auto', 'women', 'men', 'kids'].includes(request.audience)) await chrome.storage.local.set({ audience: request.audience });
         chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?devtest=1'), active: false });
       });
       return false;

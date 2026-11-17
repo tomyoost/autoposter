@@ -2683,7 +2683,7 @@ window.addEventListener('message', (event) => {
   try {
     if (cmd === 'reload') chrome.runtime.sendMessage({ action: 'devReload' });
     // Testhulp: foto's (data-URL's) naar de extensie, die ze in een popup-tabblad laat analyseren en kopiëren
-    if (cmd === 'loadListing') chrome.runtime.sendMessage({ action: 'devLoadListing', images: event.data.images });
+    if (cmd === 'loadListing') chrome.runtime.sendMessage({ action: 'devLoadListing', images: event.data.images, audience: event.data.audience });
     if (cmd === 'status') {
       chrome.storage.local.get(['devTestStatus'], (r) => window.postMessage({ autoposterDevStatus: r.devTestStatus || null }, '*'));
     }

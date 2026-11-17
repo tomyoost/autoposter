@@ -832,7 +832,10 @@ function setupEventListeners() {
   generateAIBtn.addEventListener('click', handleGenerateAI);
   
   // AI Image Analysis
-  analyzeImageBtn.addEventListener('click', handleAnalyzeImage);
+  analyzeImageBtn.addEventListener('click', () => handleAnalyzeImage());
+
+  // Voor wie (Automatisch, Dames, Heren, Kinderen)
+  initAudience();
 
   // Use Template button
   if (useTemplateBtn) {
@@ -1332,6 +1335,55 @@ function updateAnalyzeButton() {
 }
 
 // AI Image Analysis (multi-image). Usage is counted on the server; we only show what it reports.
+// ---------- Voor wie ----------
+// Eén keer kiezen, wordt onthouden. De server laat een maat of tekst op het label altijd voorgaan.
+const AUDIENCE_VALUES = ['auto', 'women', 'men', 'kids'];
+const AUDIENCE_KEYS = { auto: 'audienceAuto', women: 'audienceWomen', men: 'audienceMen', kids: 'audienceKids' };
+let audienceChoice = 'auto';
+
+function renderAudience() {
+  document.querySelectorAll('.audience-btn').forEach((btn) => {
+    const on = btn.dataset.audience === audienceChoice;
+    btn.setAttribute('aria-checked', String(on));
+    btn.tabIndex = on ? 0 : -1;
+  });
+}
+
+async function initAudience() {
+  const { audience } = await chrome.storage.local.get(['audience']);
+  audienceChoice = AUDIENCE_VALUES.includes(audience) ? audience : 'auto';
+  renderAudience();
+  document.querySelectorAll('.audience-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setAudience(btn.dataset.audience));
+  });
+  const group = document.querySelector('.audience-options');
+  if (group) {
+    group.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const i = AUDIENCE_VALUES.indexOf(audienceChoice);
+      const next = AUDIENCE_VALUES[(i + (e.key === 'ArrowRight' ? 1 : AUDIENCE_VALUES.length - 1)) % AUDIENCE_VALUES.length];
+      setAudience(next);
+      document.querySelector(`.audience-btn[data-audience="${next}"]`)?.focus();
+    });
+  }
+}
+
+async function setAudience(value) {
+  if (!AUDIENCE_VALUES.includes(value) || value === audienceChoice) return;
+  audienceChoice = value;
+  renderAudience();
+  await chrome.storage.local.set({ audience: value });
+  const t = window.i18n.t;
+  // Al bekeken? Dan dezelfde foto's opnieuw laten bekijken voor de nieuwe keuze (binnen 10 minuten telt dat niet als scan)
+  if (uploadedImages.length && analysisData.vinted && !analyzeImageBtn.disabled && !autoAnalyzing) {
+    await handleAnalyzeImage();
+    showToast(t('audienceReanalyzed').replace('{group}', t(AUDIENCE_KEYS[value])), 'success');
+  } else {
+    showToast(t('audienceSaved'), 'info');
+  }
+}
+
 async function handleAnalyzeImage(retryCount = 0) {
   const t = window.i18n.t;
   const MAX_RETRIES = 1; // the server already retries the AI call itself
@@ -1377,6 +1429,10 @@ async function handleAnalyzeImage(retryCount = 0) {
       ? { v: 1, lang: vintedCatalog.lang || '', nodes: vintedCatalog.nodes }
       : undefined;
     
+    // Altijd de bewaarde keuze (ook als de popup net open is en initAudience nog leest)
+    const { audience: storedAudience } = await chrome.storage.local.get(['audience']);
+    const audienceToSend = AUDIENCE_VALUES.includes(storedAudience) ? storedAudience : 'auto';
+
     // Create AbortController for timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), ANALYZE_TIMEOUT);
@@ -1392,7 +1448,10 @@ async function handleAnalyzeImage(retryCount = 0) {
         body: JSON.stringify({
           images: imagesToSend,
           language: window.i18n.getCurrentLanguage(),
-          catalog
+          catalog,
+          // v2: de server kiest Dames, Heren of Kinderen met vaste regels; de keuze van de verkoper telt mee
+          v: 2,
+          audience: audienceToSend
         }),
         signal: controller.signal
       });
@@ -2768,7 +2827,7 @@ function setCategoryFromPath(pathString) {
         category: analysisData.categoryPath || '', descriptionLength: document.getElementById('template').value.length,
         brand: analysisData.brand || '', size: analysisData.size || '', color: analysisData.color || '', material: analysisData.material || '',
         vinted: { catalogId: v.catalogId ?? null, brand: v.brand || '', sizeCandidates: v.sizeCandidates || [], statusId: v.statusId ?? null,
-          colorIds: v.colorIds || [], materialIds: v.materialIds || [] },
+          colorIds: v.colorIds || [], materialIds: v.materialIds || [], audience: v.audience || null, targetGroup: v.targetGroup || '' },
       };
       await chrome.storage.local.set({ devTestStatus: status });
     } catch (error) {

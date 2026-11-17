@@ -1,5 +1,6 @@
 import { json, preflight, readJson } from "../_shared/http.ts";
 import { callGemini } from "../_shared/gemini.ts";
+import { getSetting } from "../_shared/db.ts";
 import {
   currentMonth,
   enforcedLimit,
@@ -51,9 +52,26 @@ interface Stage1 {
   suggestedPrice?: number;
   quantity?: number;
   photoOrder?: Array<{ imageIndex: number; type: string; score: number }>;
+  // Alleen bij v2 (extensie 1.2.7+): bewijs voor Dames, Heren of Kinderen
+  isWearable?: boolean;
+  labelAudience?: string;
+  sizeAudience?: string;
+  childEvidence?: string;
+  garmentGender?: string;
+  usualDepartment?: string;
 }
 
 const TARGET_GROUPS = ["women", "men", "unisex_adult", "girls", "boys", "baby", "kids_unisex", "not_fashion"];
+// v2: wie het artikel draagt wordt in code beslist uit vaste bewijsvelden, niet uit één losse AI-keuze
+const AUDIENCE_CHOICES = ["auto", "women", "men", "kids"];
+const LABEL_AUDIENCES = ["women", "men", "girls", "boys", "kids", "baby", "none"];
+const SIZE_AUDIENCES = ["adult", "kids", "baby", "none"];
+const CHILD_EVIDENCE = ["worn_by_child", "child_size_mannequin", "kids_design", "none"];
+const GARMENT_GENDERS = ["women_only", "womens_cut", "mens_cut", "neutral"];
+// Vinted-id's (gelijk in elke taal): Dames, Heren, Kinderen > Meisjeskleding, Kinderen > Jongenskleding
+const FASHION_ROOTS = [1904, 5, 1193];
+type AudienceGroup = "women" | "men" | "girls" | "boys";
+const ROOT_FOR: Record<AudienceGroup, number> = { women: 1904, men: 5, girls: 1195, boys: 1194 };
 const CONDITION_KEYS = Object.keys(CONDITIONS) as ConditionKey[];
 const COLOR_CODES = Object.keys(COLORS);
 const MATERIAL_NAMES = Object.keys(MATERIALS);
@@ -105,7 +123,103 @@ const stage1Tool = {
   },
 };
 
-function stage1Prompt(language: string, tree: CatalogTree): string {
+// v2: dezelfde tool plus de bewijsvelden voor de doelgroep; prijs verplicht
+const stage1ToolV2 = (() => {
+  const t = structuredClone(stage1Tool);
+  const p = t.function.parameters;
+  Object.assign(p.properties, {
+    isWearable: { type: "boolean", description: "true for clothing, shoes, bags and fashion accessories that a person wears or carries; false for everything else" },
+    labelAudience: { type: "string", enum: LABEL_AUDIENCES, description: "Who printed text on a label, tag or packaging SAYS the item is for, in any language: Women/Dames/Femme/Damen, Men/Heren/Homme/Herren, Girls/Meisjes, Boys/Jongens, Kids/Kinder/Enfant, Baby. none if no such text is visible." },
+    sizeAudience: { type: "string", enum: SIZE_AUDIENCES, description: "What the printed size implies: kids for children's heights (92-176 cm, e.g. 104, 128, 152) or ages (2-16 years, 4Y, 6 jaar, 8 ans); baby for 50-86 cm or months; adult for XS-XXL, adult EU sizes, W/L sizes and shoe sizes 35 and up; none if no size is readable." },
+    childEvidence: { type: "string", enum: CHILD_EVIDENCE, description: "Visible proof that this is a child's item: worn by a child; shown on a child-size dress form or mannequin (small head, narrow shoulders, short torso); an unmistakable kids design (nursery or cartoon print, school uniform). none if the photos do not clearly show this. An item lying flat or on a hanger has no scale: then none." },
+    garmentGender: { type: "string", enum: GARMENT_GENDERS, description: "women_only: dresses, skirts, bras and lingerie, heels, handbags, clearly feminine blouses. womens_cut: a fitted women's cut, darts, buttons on the wearer's left side. mens_cut: men's tailoring or a typical men's style, shirt or jacket buttons on the wearer's right side. neutral: anyone could wear it (t-shirts, hoodies, sneakers, most boots, most jackets, backpacks)." },
+    usualDepartment: { type: "string", enum: ["women", "men"], description: "Where most Vinted sellers list this exact kind of item. Only used when nothing else decides it. For a child's item: women = girls, men = boys." },
+  });
+  p.required = [...p.required, "isWearable", "labelAudience", "sizeAudience", "childEvidence", "garmentGender", "usualDepartment", "suggestedPrice"];
+  return t;
+})();
+
+const STAGE1_V2_EXTRA = `
+WHO IT IS FOR (this decides Women, Men or Kids on Vinted; be strict, the same photos must always give the same answer)
+- isWearable: clothing, shoes, bags and fashion accessories.
+- labelAudience: only from printed text on a label, tag or packaging.
+- sizeAudience: only from the size that is printed.
+- childEvidence: only when the photos clearly show it. A garment lying flat or on a hanger has no scale, so that alone is never proof.
+- garmentGender and usualDepartment: judge the item itself.
+
+PRICE (replaces the price rule above)
+- The price this item usually sells for on Vinted in the Netherlands in this condition, not the new price.
+- Work it out the same way every time: first the brand level, then the item type, then the condition.
+  - No brand or an unknown brand: tops and shirts 5-12, trousers and knitwear 8-15, jackets and coats 15-30, shoes 10-25, bags 10-25.
+  - High-street brands (H&M, Zara, Primark, C&A, Mango): the same as no brand, up to 1.5 times.
+  - Popular mid-range brands (Levi's, Wrangler, adidas, Nike, Tommy Hilfiger, Lacoste, Ralph Lauren, Carhartt, Dr. Martens, Massimo Dutti, Sebago): tops and shirts 15-30, knitwear 25-45, jackets 35-70, jeans 20-35, shoes 30-60, bags 25-50.
+  - Premium and designer brands: higher, in line with the brand.
+  - A clear vintage piece (80s or 90s) of a popular brand: the upper half of the range.
+  - Condition good: about 20% lower. Condition satisfactory: about 40% lower.
+- Give one round number.`;
+
+function stage1Prompt(language: string, tree: CatalogTree, v2 = false): string {
+  return stage1PromptBase(language, tree) + (v2 ? `\n${STAGE1_V2_EXTRA}` : "");
+}
+
+/** Prijs afronden op bedragen die Vinted-verkopers gebruiken, zodat kleine verschillen wegvallen. */
+const PRICE_STEPS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 18, 20, 22, 25, 28, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 90, 100, 110, 120, 130, 140, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500];
+function roundPrice(p: number): number {
+  if (p > 500) return Math.round(p / 50) * 50;
+  return PRICE_STEPS.reduce((best, step) => (Math.abs(step - p) < Math.abs(best - p) ? step : best), PRICE_STEPS[0]);
+}
+
+/** Kindermaat in de maattekst zelf (jaren, maanden, lengte in cm). */
+function audienceFromSizeText(label: string): "kids" | "baby" | null {
+  const s = label.toLowerCase();
+  if (/\b\d{1,2}\s*-?\s*(m|mnd|months?|mois|monate)\b/.test(s)) return "baby";
+  const years = s.match(/\b(\d{1,2})\s*(y|yrs?|years?|jaar|jr|ans|jahre|t)\b/);
+  if (years && Number(years[1]) <= 16) return "kids";
+  const cm = s.match(/\b(\d{2,3})\s*cm\b/);
+  if (cm) {
+    const n = Number(cm[1]);
+    if (n >= 50 && n <= 86) return "baby";
+    if (n >= 92 && n <= 176) return "kids";
+  }
+  return null;
+}
+
+/**
+ * Dames, Heren, Meisjes of Jongens, met vaste voorrang: wat het label zegt, dan de maat, dan wat de foto
+ * echt laat zien, dan de keuze van de verkoper in de popup, dan de snit, dan waar Vinted-verkopers het meestal zetten.
+ */
+function decideAudience(s1: Stage1, choice: string): { group: AudienceGroup; reason: string } | null {
+  if (s1.isWearable !== true) return null;
+  const label = LABEL_AUDIENCES.includes(String(s1.labelAudience)) ? String(s1.labelAudience) : "none";
+  const size = audienceFromSizeText(str(s1.sizeLabel)) ??
+    (SIZE_AUDIENCES.includes(String(s1.sizeAudience)) ? String(s1.sizeAudience) : "none");
+  const child = CHILD_EVIDENCE.includes(String(s1.childEvidence)) && s1.childEvidence !== "none";
+  const garment = GARMENT_GENDERS.includes(String(s1.garmentGender)) ? String(s1.garmentGender) : "neutral";
+
+  let kids: boolean;
+  let ageWhy: string;
+  if (["girls", "boys", "kids", "baby"].includes(label)) [kids, ageWhy] = [true, "label"];
+  else if (label === "women" || label === "men") [kids, ageWhy] = [false, "label"];
+  else if (size === "kids" || size === "baby") [kids, ageWhy] = [true, "size"];
+  else if (size === "adult") [kids, ageWhy] = [false, "size"];
+  else if (child) [kids, ageWhy] = [true, "photo"];
+  else if (choice === "kids") [kids, ageWhy] = [true, "choice"];
+  else [kids, ageWhy] = [false, choice === "women" || choice === "men" ? "choice" : "auto"];
+
+  let female: boolean;
+  let genderWhy: string;
+  if (label === "women" || label === "girls") [female, genderWhy] = [true, "label"];
+  else if (label === "men" || label === "boys") [female, genderWhy] = [false, "label"];
+  else if (garment === "women_only") [female, genderWhy] = [true, "garment"];
+  else if (!kids && (choice === "women" || choice === "men")) [female, genderWhy] = [choice === "women", "choice"];
+  else if (garment === "womens_cut" || garment === "mens_cut") [female, genderWhy] = [garment === "womens_cut", "cut"];
+  else [female, genderWhy] = [s1.usualDepartment !== "men", "usual"];
+
+  const group: AudienceGroup = kids ? (female ? "girls" : "boys") : (female ? "women" : "men");
+  return { group, reason: `${ageWhy}/${genderWhy}` };
+}
+
+function stage1PromptBase(language: string, tree: CatalogTree): string {
   const lang = language === "nl" ? "Dutch" : "English";
   return `You are an experienced second-hand reseller who lists items on Vinted every day: vintage clothing, shoes, bags, home goods, bikes and more. From the seller's photos you fill in the Vinted listing form exactly as a careful, experienced seller would.
 
@@ -175,6 +289,7 @@ Rules:
 - Respect the target group for clothing and shoes (women, men, kids). For unisex adult clothing decide by cut and size; if still unclear, choose men for workwear, outdoor jackets and hoodies, women for clearly feminine cuts.
 - Avoid "Other" categories when a specific one fits.
 - Seller convention: rain covers, canopies and weather covers for cargo bikes or bike boxes go in the category for panniers and bike bags.
+- If the item has an "audience", it has already been decided: only choose within that department.
 - Answer only with an id that is in the list.`;
 
 // ---------------------------------------------------------------------------------------------
@@ -235,9 +350,12 @@ Deno.serve(async (req) => {
   try {
     const parsed = await readJson(req, 16 * 1024 * 1024);
     if (!parsed.ok) return parsed.response;
-    const { image, images, language: rawLanguage, catalog: rawCatalog } = parsed.body;
+    const { image, images, language: rawLanguage, catalog: rawCatalog, v: rawVersion, audience: rawAudience } = parsed.body;
     const language = VALID_LANGUAGES.includes(rawLanguage) ? rawLanguage : "en";
     const en = language === "en";
+    // v2 (extensie 1.2.7+): doelgroep in code beslist, keuze van de verkoper, rustigere prijs. Oudere versies merken niets.
+    const v2 = Number(rawVersion) >= 2;
+    const audienceChoice = AUDIENCE_CHOICES.includes(rawAudience) ? String(rawAudience) : "auto";
 
     // Foto's controleren
     const imageList: unknown[] = Array.isArray(images) ? images : image ? [image] : [];
@@ -306,6 +424,10 @@ Deno.serve(async (req) => {
       ...photos,
     ];
 
+    // v2: lagere temperatuur (instelbaar in app_settings, null = standaard van het model) voor dezelfde uitkomst bij dezelfde foto's
+    const temperature = v2 ? await getSetting<number | null>("ai_temperature_v2", 0.2) : null;
+    const tempField = typeof temperature === "number" ? { temperature } : {};
+
     let s1: Stage1 | null = null;
     let s1Model = "";
     let lastCode = "AI_NO_CONTENT";
@@ -315,12 +437,13 @@ Deno.serve(async (req) => {
       if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
       const ai = await callGemini("analyze", {
         messages: [
-          { role: "system", content: stage1Prompt(language, tree) },
+          { role: "system", content: stage1Prompt(language, tree, v2) },
           { role: "user", content: userContent },
         ],
-        tools: [stage1Tool],
+        tools: [v2 ? stage1ToolV2 : stage1Tool],
         tool_choice: { type: "function", function: { name: "fill_vinted_listing" } },
         max_tokens: 4096,
+        ...tempField,
       }, { deadline: deadline - 6_000 });
       if (!ai.ok) {
         lastCode = ai.code;
@@ -343,9 +466,15 @@ Deno.serve(async (req) => {
     // ---------- Stap 2: de exacte categorie uit de echte Vinted-lijst ----------
     // Hoofdcategorieën uit stap 1: id's, of (soms) namen
     const rootByName = new Map(tree.roots.map((id) => [tree.byId.get(id)!.title.toLowerCase(), id]));
-    const rootIds = [...new Set(strList(s1.topLevelIds, 2, 40)
+    let rootIds = [...new Set(strList(s1.topLevelIds, 2, 40)
       .map((x) => /^\d+$/.test(x) ? parseInt(x, 10) : rootByName.get(x.toLowerCase()) ?? NaN)
       .filter((id) => tree.roots.includes(id)))];
+    // v2: kleding, schoenen en tassen alleen in de afdeling die decideAudience koos (niet als de AI zelf
+    // een andere hoofdcategorie voorop zet, zoals Sport voor een fietshelm of Huis)
+    const audience = v2 ? decideAudience(s1, audienceChoice) : null;
+    if (audience && (rootIds.length === 0 || FASHION_ROOTS.includes(rootIds[0])) && tree.byId.has(ROOT_FOR[audience.group])) {
+      rootIds = [ROOT_FOR[audience.group]];
+    }
     // Onbekend: geen AI over de hele boom (te groot en traag), maar de noodkeuze over alle eindcategorieën
     const skipAiChoice = rootIds.length === 0;
     const { lines, ids: candidateIds } = leafLines(tree, skipAiChoice ? tree.roots : rootIds);
@@ -362,6 +491,7 @@ Deno.serve(async (req) => {
         brand: str(s1.brand),
         materials: strList(s1.materials, 3),
         tags: strList(s1.suggestedTags, 8),
+        ...(audience ? { audience: audience.group } : {}),
       };
       const ai = await callGemini("category", {
         messages: [
@@ -371,6 +501,7 @@ Deno.serve(async (req) => {
         tools: [stage2Tool],
         tool_choice: { type: "function", function: { name: "choose_category" } },
         max_tokens: 1024,
+        ...tempField,
       }, { deadline });
       if (ai.ok) {
         s2Model = ai.model;
@@ -425,7 +556,11 @@ Deno.serve(async (req) => {
       quantity: Number.isFinite(s1.quantity) && (s1.quantity as number) >= 1 ? Math.min(99, Math.round(s1.quantity as number)) : 1,
       suggestedTitle: str(s1.suggestedTitle, 80),
       suggestedTags: strList(s1.suggestedTags, 8, 40),
-      suggestedPrice: Number.isFinite(s1.suggestedPrice) ? Math.max(1, Math.round((s1.suggestedPrice as number) * 100) / 100) : undefined,
+      suggestedPrice: Number.isFinite(s1.suggestedPrice)
+        ? (v2 && (s1.suggestedPrice as number) > 0
+          ? roundPrice(s1.suggestedPrice as number)
+          : Math.max(1, Math.round((s1.suggestedPrice as number) * 100) / 100))
+        : undefined,
       photoOrder: Array.isArray(s1.photoOrder) ? s1.photoOrder : [],
       // Nieuw: alles wat de extensie op Vinted zelf invult
       vinted: {
@@ -442,7 +577,8 @@ Deno.serve(async (req) => {
         sizeLabel,
         sizeCandidates: strList(s1.sizeCandidates, 4, 20),
         itemType: str(s1.itemType, 80),
-        targetGroup: str(s1.targetGroup, 20),
+        targetGroup: audience ? audience.group : str(s1.targetGroup, 20),
+        ...(v2 ? { audience: audience ? { group: audience.group, reason: audience.reason, choice: audienceChoice } : null } : {}),
       },
     };
 
