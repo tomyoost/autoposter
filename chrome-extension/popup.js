@@ -2733,3 +2733,48 @@ function setCategoryFromPath(pathString) {
   // Update analysis data
   analysisData.categoryPath = pathString;
 }
+
+// DEV-RELOAD-BEGIN (testhulp, alleen de uitgepakte ontwikkelversie; de bouwstap haalt dit blok uit de zip voor de Web Store)
+// popup.html?devtest=1 neemt foto's uit devTestImages en doet precies wat Tomy doet: foto's toevoegen (automatische
+// analyse en beschrijving), dan Kopieer. Daarna staat de uitkomst in devTestStatus en sluit het tabblad.
+(function devTestHelper() {
+  if (new URLSearchParams(location.search).get('devtest') !== '1') return;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  window.addEventListener('load', () => setTimeout(async () => {
+    const self = await chrome.management.getSelf();
+    if (!self || self.installType !== 'development') return;
+    const { devTestImages } = await chrome.storage.local.get(['devTestImages']);
+    if (!Array.isArray(devTestImages) || !devTestImages.length) return;
+    await chrome.storage.local.remove(['devTestImages']);
+    await chrome.storage.local.set({ devTestStatus: { state: 'busy', at: Date.now() } });
+    try {
+      clearForm();
+      await wait(400);
+      const files = await Promise.all(devTestImages.map(async (img, i) => {
+        const blob = await (await fetch(img.dataUrl)).blob();
+        return new File([blob], img.name || `foto-${i + 1}.jpg`, { type: blob.type || 'image/jpeg' });
+      }));
+      const t0 = Date.now();
+      await handleFiles(files);
+      while (Date.now() - t0 < 120000 && (analyzeImageBtn.classList.contains('loading') ||
+        generateAIBtn.classList.contains('loading'))) await wait(300);
+      const aiSeconds = Math.round((Date.now() - t0) / 100) / 10;
+      await handleCopyForPlatform('vinted');
+      const v = analysisData.vinted || {};
+      const status = {
+        state: document.getElementById('title').value.trim() ? 'done' : 'empty', at: Date.now(), aiSeconds,
+        photos: uploadedImages.length, title: document.getElementById('title').value,
+        price: document.getElementById('price').value, condition: document.getElementById('condition').value,
+        category: analysisData.categoryPath || '', descriptionLength: document.getElementById('template').value.length,
+        brand: analysisData.brand || '', size: analysisData.size || '', color: analysisData.color || '', material: analysisData.material || '',
+        vinted: { catalogId: v.catalogId ?? null, brand: v.brand || '', sizeCandidates: v.sizeCandidates || [], statusId: v.statusId ?? null,
+          colorIds: v.colorIds || [], materialIds: v.materialIds || [] },
+      };
+      await chrome.storage.local.set({ devTestStatus: status });
+    } catch (error) {
+      await chrome.storage.local.set({ devTestStatus: { state: 'error', at: Date.now(), message: String(error && error.message || error).slice(0, 200) } });
+    }
+    setTimeout(() => window.close(), 600);
+  }, 1500));
+})();
+// DEV-RELOAD-END

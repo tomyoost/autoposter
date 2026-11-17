@@ -2674,8 +2674,16 @@ init();
 // Laat de CTO de extensie na een nieuwe testversie herladen vanaf de Vinted-pagina, zonder klik van Tomy.
 // De achtergrond herlaadt alleen als dit een uitgepakte extensie is (installType "development").
 window.addEventListener('message', (event) => {
-  if (event.source !== window || !event.data || event.data.autoposterDev !== 'reload') return;
-  try { chrome.runtime.sendMessage({ action: 'devReload' }); } catch (_) { /* oude pagina na herladen */ }
+  if (event.source !== window || !event.data || typeof event.data.autoposterDev !== 'string') return;
+  const cmd = event.data.autoposterDev;
+  try {
+    if (cmd === 'reload') chrome.runtime.sendMessage({ action: 'devReload' });
+    // Testhulp: foto's (data-URL's) naar de extensie, die ze in een popup-tabblad laat analyseren en kopiëren
+    if (cmd === 'loadListing') chrome.runtime.sendMessage({ action: 'devLoadListing', images: event.data.images });
+    if (cmd === 'status') {
+      chrome.storage.local.get(['devTestStatus'], (r) => window.postMessage({ autoposterDevStatus: r.devTestStatus || null }, '*'));
+    }
+  } catch (_) { /* oude pagina na herladen */ }
 });
 // DEV-RELOAD-END
 

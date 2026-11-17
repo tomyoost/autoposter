@@ -41,6 +41,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (self && self.installType === 'development') chrome.runtime.reload();
       });
       return false;
+
+    // Testhulp: laadt foto's in een popup-tabblad, dat ze precies zo verwerkt als de popup (analyse, beschrijving, Kopieer)
+    case 'devLoadListing':
+      chrome.management.getSelf(async (self) => {
+        if (!self || self.installType !== 'development' || !Array.isArray(request.images) || !request.images.length) return;
+        await chrome.storage.local.set({ devTestImages: request.images.slice(0, 10), devTestStatus: { state: 'queued', at: Date.now() } });
+        chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?devtest=1'), active: false });
+      });
+      return false;
     // DEV-RELOAD-END
 
     case 'trackEvent':
