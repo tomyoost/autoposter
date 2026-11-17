@@ -66,9 +66,10 @@ export async function callGemini(
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(body),
-          // Met een reservemodel achter de hand: niet langer dan 22 s wachten en 12 s overlaten voor de reserve
+          // Met een reservemodel achter de hand: niet langer dan 30 s wachten en 8 s overlaten voor de reserve.
+          // (Was 22 s: het hoofdmodel deed er soms langer dan 22 s over en dan nam het zwakkere reservemodel het over.)
           signal: AbortSignal.timeout(
-            Math.min(remaining - 500, hasReserve ? Math.max(8_000, Math.min(22_000, remaining - 12_000)) : 35_000),
+            Math.min(remaining - 500, hasReserve ? Math.max(8_000, Math.min(30_000, remaining - 8_000)) : 35_000),
           ),
         });
       } catch (e) {
