@@ -2167,6 +2167,7 @@ async function uploadImagesToVinted(images) {
   
   const CONFIRMATION_TIMEOUT = 10000; // Increased for stability
   const PHOTO_SETTLE_MS = 900; // pauze na elke bevestigde foto (Vinted verwerkt nog)
+  const LATE_PHOTO_GRACE_MS = 15000; // extra wachttijd voordat een trage foto opnieuw wordt gestuurd
   const DELAY_BETWEEN_UPLOADS = 2000; // Increased to prevent rate limiting
   const MAX_CONSECUTIVE_FAILURES = 3; // Stop after 3 consecutive failures
   
@@ -2249,7 +2250,12 @@ async function uploadImagesToVinted(images) {
         }
         
         // Wait for DOM verification (thumbnail should appear)
-        const confirmed = await waitForThumbnailIncrease(initialThumbnailCount, CONFIRMATION_TIMEOUT);
+        let confirmed = await waitForThumbnailIncrease(initialThumbnailCount, CONFIRMATION_TIMEOUT);
+        if (!confirmed) {
+          // Vinted is soms traag en de foto kan nog binnenkomen. Pas opnieuw sturen als hij echt niet
+          // verschijnt, anders staat hij er straks twee keer (gezien 17-11-2026: 3 foto's bij 2 geplakte).
+          confirmed = await waitForThumbnailIncrease(initialThumbnailCount, LATE_PHOTO_GRACE_MS);
+        }
         
         if (confirmed) {
           successCount++;
