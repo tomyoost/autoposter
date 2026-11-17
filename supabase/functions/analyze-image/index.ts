@@ -227,7 +227,8 @@ function decideAudience(s1: Stage1, choice: string): { group: AudienceGroup; rea
   else if (label === "men" || label === "boys") [female, genderWhy] = [false, "label"];
   else if (garment === "women_only") [female, genderWhy] = [true, "garment"];
   else if (!kids && (choice === "women" || choice === "men")) [female, genderWhy] = [choice === "women", "choice"];
-  else if (garment === "womens_cut" || garment === "mens_cut") [female, genderWhy] = [garment === "womens_cut", "cut"];
+  // Snit alleen bij volwassenen: bij kinderkleding is die nauwelijks te zien en wisselde de AI (17-11-2026)
+  else if (!kids && (garment === "womens_cut" || garment === "mens_cut")) [female, genderWhy] = [garment === "womens_cut", "cut"];
   else [female, genderWhy] = [neutralIsFemale(s1), "table"];
 
   const group: AudienceGroup = kids ? (female ? "girls" : "boys") : (female ? "women" : "men");
