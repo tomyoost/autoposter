@@ -48,9 +48,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (!self || self.installType !== 'development' || !Array.isArray(request.images) || !request.images.length) return;
         await chrome.storage.local.set({ devTestImages: request.images.slice(0, 10), devTestStatus: { state: 'queued', at: Date.now() } });
         if (['auto', 'women', 'men', 'kids'].includes(request.audience)) await chrome.storage.local.set({ audience: request.audience });
-        // Eigen klein venster (zichtbaar, niet gefocust): een achtergrondtabblad wordt door Chrome of een
-        // tab-slaapprogramma stilgezet en dan blijft de test hangen (17-11-2026).
-        chrome.windows.create({ url: chrome.runtime.getURL('popup.html?devtest=1'), type: 'popup', focused: false, width: 440, height: 720, left: 20, top: 20 });
+        // Als voorgrondtabblad naast het Vinted-tabblad: op de achtergrond (of in een eigen venster) zette Chrome
+        // de test stil en duurde hij minuten (17-11-2026). Na afloop sluit hij en keert Chrome terug naar Vinted.
+        const opener = sender && sender.tab ? { openerTabId: sender.tab.id, windowId: sender.tab.windowId, index: sender.tab.index + 1 } : {};
+        chrome.tabs.create({ url: chrome.runtime.getURL('popup.html?devtest=1'), active: true, ...opener });
       });
       return false;
     // DEV-RELOAD-END
