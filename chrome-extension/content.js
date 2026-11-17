@@ -2392,6 +2392,10 @@ async function handlePaste() {
   }
   
   const pasteStartedAt = Date.now();
+  // Wat er vóór het plakken al in merk, maat, staat, kleur en materiaal stond, heeft de gebruiker zelf gekozen.
+  // Wat Vinted er daarna zelf in zet (voorstellen uit de foto's) mag de AI-waarde vervangen.
+  const userFilledBefore = (window.AutoposterVinted && typeof window.AutoposterVinted.filledFields === 'function')
+    ? window.AutoposterVinted.filledFields() : [];
   btn.innerHTML = `${AP_SPINNER}<span>${t('filling')}</span>`;
   btn.disabled = true;
   btn.style.opacity = '0.7';
@@ -2475,7 +2479,7 @@ async function handlePaste() {
       const categoryPresent = categoryOk || (typeof filler.hasCategory === 'function' && filler.hasCategory());
       if (categoryPresent) {
         showNotification(`⏳ ${t('stepDetails')}`, 'info', 2500);
-        const done = await filler.fillVintedFields(vinted, { category: false });
+        const done = await filler.fillVintedFields(vinted, { category: false, userFilled: userFilledBefore });
         for (const [key, ok] of Object.entries(done)) {
           if (ok !== undefined) results.push({ success: !!ok, fieldName: t(key), key });
         }

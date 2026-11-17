@@ -282,10 +282,25 @@
     return !!ok;
   }
 
-  async function selectMulti(inputId, contentId, prefix, ids, max) {
+  async function selectMulti(inputId, contentId, prefix, ids, max, replace = false) {
     if (!Array.isArray(ids) || ids.length === 0) return false;
     const opened = await openDropdown(inputId, contentId);
     if (!opened) return false;
+    const want = new Set(ids.slice(0, max).map((id) => `${prefix}-${id}`));
+    const isChecked = (opt) => {
+      const box = opt.closest('[aria-checked]') || opt.querySelector('[aria-checked]');
+      return !!box && box.getAttribute('aria-checked') === 'true';
+    };
+    if (replace) {
+      // Vinted zette er zelf iets in (eigen voorstel uit de foto's): haal dat eerst weg
+      for (const opt of opened.content.querySelectorAll(`[data-testid^="${prefix}-"]`)) {
+        const tid = opt.getAttribute('data-testid');
+        if (/^\w+-\d+$/.test(tid) && !want.has(tid) && isChecked(opt)) {
+          realClick(opt);
+          await sleep(200);
+        }
+      }
+    }
     let picked = 0;
     for (const id of ids.slice(0, max)) {
       const opt = byTestId(`${prefix}-${id}`, opened.content);
@@ -304,9 +319,18 @@
     return picked > 0 && !!fieldValue(byTestId(opened.input.getAttribute('data-testid')) || opened.input);
   }
 
+  const DETAIL_FIELDS = ['brand-select-dropdown-input', 'category-size-single-grid-input',
+    'category-condition-single-list-input', 'color-select-dropdown-input', 'category-material-multi-list-input'];
+
+  /** Welke vakken al een waarde hadden vóór het plakken (die heeft de gebruiker zelf gekozen). */
+  function filledFields() {
+    return DETAIL_FIELDS.filter((t) => fieldValue(byTestId(t)));
+  }
+
   /**
    * Vult alles in wat de AI voor Vinted heeft bepaald. Geeft per veld terug of het lukte.
-   * Velden die al een waarde hebben (bijv. door de gebruiker gekozen) blijven staan.
+   * Wat de gebruiker vóór het plakken zelf koos (opts.userFilled) blijft staan. Wat Vinted er tijdens het plakken zelf
+   * in zet (Vinted stelt na elke foto een merk e.d. voor, en dat is vaak fout) mag de AI-waarde vervangen.
    */
   async function fillVintedFields(v, opts = {}) {
     const done = {};
@@ -320,22 +344,28 @@
     if (!hasDetails) return done;
     await sleep(400);
 
+    const userFilled = new Set(Array.isArray(opts.userFilled) ? opts.userFilled : []);
+    // Invullen als het vak bestaat en de gebruiker het niet zelf vóór het plakken had ingevuld
     const empty = (testId) => {
       const el = byTestId(testId);
-      return el && !fieldValue(el);
+      return !!el && !userFilled.has(testId) && (!fieldValue(el) || opts.replaceVinted !== false);
     };
-    if (v.brand && empty('brand-select-dropdown-input')) done.brand = await selectBrand(v.brand);
+    const replace = (testId) => !!fieldValue(byTestId(testId));
+    if (v.brand && empty('brand-select-dropdown-input')) {
+      const now = norm(fieldValue(byTestId('brand-select-dropdown-input')));
+      done.brand = now && now === norm(v.brand) ? true : await selectBrand(v.brand);
+    }
     // No size readable on the photos: leave it to the user (not a failure)
     if (Array.isArray(v.sizeCandidates) && v.sizeCandidates.length && empty('category-size-single-grid-input')) {
       done.size = await selectSize(v.sizeCandidates);
     }
     if (empty('category-condition-single-list-input')) done.condition = await selectCondition(v.statusId);
     if (Array.isArray(v.colorIds) && v.colorIds.length && empty('color-select-dropdown-input')) {
-      done.colors = await selectMulti('color-select-dropdown-input', 'color-select-dropdown-content', 'color', v.colorIds, 2);
+      done.colors = await selectMulti('color-select-dropdown-input', 'color-select-dropdown-content', 'color', v.colorIds, 2, replace('color-select-dropdown-input'));
     }
     // Materiaal is op Vinted optioneel: alleen invullen (en melden) als de AI het zeker weet
     if (Array.isArray(v.materialIds) && v.materialIds.length && empty('category-material-multi-list-input')) {
-      done.material = await selectMulti('category-material-multi-list-input', 'category-material-multi-list-content', 'material', v.materialIds, 3);
+      done.material = await selectMulti('category-material-multi-list-input', 'category-material-multi-list-content', 'material', v.materialIds, 3, replace('category-material-multi-list-input'));
     }
     return done;
   }
@@ -348,6 +378,7 @@
   window.AutoposterVinted = {
     refreshCatalog, fillVintedFields, selectCategory, hasCategory,
     categoryReason: () => lastCategoryReason,
+    filledFields,
   };
 
   // Boom alvast ophalen, zodat de volgende analyse in de popup de eigen lijst van de gebruiker gebruikt.
