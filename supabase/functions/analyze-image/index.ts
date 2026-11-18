@@ -59,6 +59,7 @@ interface Stage1 {
   childEvidence?: string;
   garmentGender?: string;
   itemClass?: string;
+  cutCertainty?: string;
 }
 
 const TARGET_GROUPS = ["women", "men", "unisex_adult", "girls", "boys", "baby", "kids_unisex", "not_fashion"];
@@ -137,9 +138,10 @@ const stage1ToolV2 = (() => {
     sizeAudience: { type: "string", enum: SIZE_AUDIENCES, description: "What the printed size implies: kids for children's heights (92-176 cm, e.g. 104, 128, 152) or ages (2-16 years, 4Y, 6 jaar, 8 ans); baby for 50-86 cm or months; adult for XS-XXL, adult EU sizes, W/L sizes and shoe sizes 35 and up; none if no size is readable." },
     childEvidence: { type: "string", enum: CHILD_EVIDENCE, description: "Visible proof that this is a child's item: worn by a child; shown on a child-size dress form or mannequin (small head, narrow shoulders, short torso); an unmistakable kids design (nursery or cartoon print, school uniform). none if the photos do not clearly show this. An item lying flat or on a hanger has no scale: then none." },
     garmentGender: { type: "string", enum: GARMENT_GENDERS, description: "women_only: dresses, skirts, bras and lingerie, heels, handbags, clearly feminine blouses. womens_cut: a women's cut you can clearly see: fitted waist, darts, buttons on the wearer's left side. mens_cut: a men's cut you can clearly see: men's tailoring, shirt or jacket buttons on the wearer's right side. neutral: everything else, including all flat shoes, boots, sneakers and loafers, t-shirts, hoodies, sweatshirts, most jackets and backpacks. Never decide by style, brand or who usually buys it." },
+    cutCertainty: { type: "string", enum: ["clear", "unsure"], description: "clear: the women's or men's cut is unmistakable (bust darts, hourglass waist, a men's suit jacket, a men's dress shirt). unsure: anything you could argue either way, and everything with garmentGender neutral." },
     itemClass: { type: "string", enum: ITEM_CLASSES, description: "What kind of item it is, by type only: tops (t-shirts, tank tops, polos), shirts (button shirts), blouses, knitwear (jumpers, cardigans), sweatshirts (sweatshirts, hoodies, track tops), jackets (jackets, coats, blazers, gilets), trousers (jeans, trousers, shorts), dresses (dresses, skirts), suits, swimwear, underwear (underwear, nightwear), shoes (all footwear), bags, accessories (belts, hats, scarves, jewellery, sunglasses), other." },
   });
-  p.required = [...p.required, "isWearable", "labelAudience", "sizeAudience", "childEvidence", "garmentGender", "itemClass", "suggestedPrice"];
+  p.required = [...p.required, "isWearable", "labelAudience", "sizeAudience", "childEvidence", "garmentGender", "cutCertainty", "itemClass", "suggestedPrice"];
   return t;
 })();
 
@@ -150,6 +152,7 @@ WHO IT IS FOR (this decides Women, Men or Kids on Vinted; be strict, the same ph
 - sizeAudience: only from the size that is printed.
 - childEvidence: only when the photos clearly show it. A garment lying flat or on a hanger has no scale, so that alone is never proof.
 - garmentGender and itemClass: judge the item itself (type and cut), never a team, sport, print or slogan on it. When anyone could wear it, say neutral: a fixed rule then decides.
+- cutCertainty: clear only when the women's or men's cut is unmistakable. For vintage, ethnic, boxy, oversized or flat-laid items where you could argue either way: unsure.
 
 PRICE (replaces the price rule above)
 - The price this item usually sells for on Vinted in the Netherlands in this condition, not the new price.
@@ -160,6 +163,7 @@ PRICE (replaces the price rule above)
   - Premium and designer brands: higher, in line with the brand.
   - A clear vintage piece (80s or 90s) of a popular brand: the upper half of the range.
   - Condition good: about 20% lower. Condition satisfactory: about 40% lower.
+- Not clothing, shoes or bags (isWearable false): estimate the usual new price of this exact product and give 50% of it for very_good, 40% for good, 25% for satisfactory, 70% for new.
 - Give one round number.`;
 
 function stage1Prompt(language: string, tree: CatalogTree, v2 = false): string {
@@ -228,7 +232,7 @@ function decideAudience(s1: Stage1, choice: string): { group: AudienceGroup; rea
   else if (garment === "women_only") [female, genderWhy] = [true, "garment"];
   else if (!kids && (choice === "women" || choice === "men")) [female, genderWhy] = [choice === "women", "choice"];
   // Snit alleen bij volwassenen: bij kinderkleding is die nauwelijks te zien en wisselde de AI (17-11-2026)
-  else if (!kids && (garment === "womens_cut" || garment === "mens_cut")) [female, genderWhy] = [garment === "womens_cut", "cut"];
+  else if (!kids && s1.cutCertainty === "clear" && (garment === "womens_cut" || garment === "mens_cut")) [female, genderWhy] = [garment === "womens_cut", "cut"];
   else [female, genderWhy] = [neutralIsFemale(s1), "table"];
 
   const group: AudienceGroup = kids ? (female ? "girls" : "boys") : (female ? "women" : "men");
