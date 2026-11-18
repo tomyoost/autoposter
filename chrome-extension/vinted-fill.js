@@ -101,7 +101,9 @@
       input.scrollIntoView({ block: 'center' });
       // Knop (nieuw): volledige muisklik. Invulveld (oud): gewone klik. Lukt de ene niet, probeer de andere.
       if (input.tagName === 'BUTTON') realClick(input); else input.click();
-      if (!(await waitFor(() => byTestId(contentTestId), 1200))) {
+      // Ruim wachten vóór de andere klik: is Vinted traag en gaat de lijst net daarna alsnog open,
+      // dan zou de tweede klik hem weer dichtdoen (18-11-2026: kleur bleef leeg).
+      if (!(await waitFor(() => byTestId(contentTestId), 2500))) {
         if (input.tagName === 'BUTTON') input.click(); else realClick(input);
       }
     }
@@ -366,21 +368,31 @@
       return !!el && !userFilled.has(testId) && (!fieldValue(el) || opts.replaceVinted !== false);
     };
     const replace = (testId) => !!fieldValue(byTestId(testId));
+    // Vinted tekent het formulier soms opnieuw terwijl we bezig zijn (trage verbinding). Mislukt een vak,
+    // dan na een korte pauze nog één keer proberen (18-11-2026: kleur bleef leeg bij een trage Vinted).
+    const twice = async (fn) => {
+      if (await fn()) return true;
+      await sleep(1500);
+      return !!(await fn());
+    };
     if (v.brand && empty('brand-select-dropdown-input')) {
-      const now = norm(fieldValue(byTestId('brand-select-dropdown-input')));
-      done.brand = now && now === norm(v.brand) ? true : await selectBrand(v.brand);
+      const sameBrand = () => {
+        const now = norm(fieldValue(byTestId('brand-select-dropdown-input')));
+        return !!now && now === norm(v.brand);
+      };
+      done.brand = sameBrand() ? true : await twice(async () => sameBrand() || selectBrand(v.brand));
     }
     // No size readable on the photos: leave it to the user (not a failure)
     if (Array.isArray(v.sizeCandidates) && v.sizeCandidates.length && empty('category-size-single-grid-input')) {
-      done.size = await selectSize(v.sizeCandidates);
+      done.size = await twice(() => selectSize(v.sizeCandidates));
     }
-    if (empty('category-condition-single-list-input')) done.condition = await selectCondition(v.statusId);
+    if (empty('category-condition-single-list-input')) done.condition = await twice(() => selectCondition(v.statusId));
     if (Array.isArray(v.colorIds) && v.colorIds.length && empty('color-select-dropdown-input')) {
-      done.colors = await selectMulti('color-select-dropdown-input', 'color-select-dropdown-content', 'color', v.colorIds, 2, replace('color-select-dropdown-input'));
+      done.colors = await twice(() => selectMulti('color-select-dropdown-input', 'color-select-dropdown-content', 'color', v.colorIds, 2, replace('color-select-dropdown-input')));
     }
     // Materiaal is op Vinted optioneel: alleen invullen (en melden) als de AI het zeker weet
     if (Array.isArray(v.materialIds) && v.materialIds.length && empty('category-material-multi-list-input')) {
-      done.material = await selectMulti('category-material-multi-list-input', 'category-material-multi-list-content', 'material', v.materialIds, 3, replace('category-material-multi-list-input'));
+      done.material = await twice(() => selectMulti('category-material-multi-list-input', 'category-material-multi-list-content', 'material', v.materialIds, 3, replace('category-material-multi-list-input')));
     }
     return done;
   }
