@@ -2693,6 +2693,10 @@ window.addEventListener('message', (event) => {
     if (cmd === 'status') {
       chrome.storage.local.get(['devTestStatus'], (r) => window.postMessage({ autoposterDevStatus: r.devTestStatus || null }, '*'));
     }
+    // Testhulp voor opnames: licht of donker thema van de popup zetten (en na afloop terugzetten)
+    if (cmd === 'theme' && ['light', 'dark'].includes(event.data.theme)) {
+      chrome.storage.local.get(['theme'], (r) => chrome.storage.local.set({ theme: event.data.theme }, () => window.postMessage({ autoposterDevTheme: { was: r.theme || null, now: event.data.theme } }, '*')));
+    }
   } catch (_) { /* oude pagina na herladen */ }
 });
 // DEV-RELOAD-END
