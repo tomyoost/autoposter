@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { CONTROLLER, PRODUCT_NAME, publicAsset } from "@/config/site";
+import { CONTROLLER, GUMROAD_PARTNER_URL, PRODUCT_NAME, publicAsset } from "@/config/site";
 
 const SiteFooter = () => (
   <footer className="border-t border-border/40 py-8 px-6">
@@ -19,6 +19,14 @@ const SiteFooter = () => (
           className="text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           Contact
+        </a>
+        <a
+          href={GUMROAD_PARTNER_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Partner worden
         </a>
       </nav>
       <div className="text-sm text-muted-foreground text-center md:text-right">

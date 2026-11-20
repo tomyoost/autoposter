@@ -10,6 +10,8 @@ export const CHROME_WEB_STORE_URL = "https://chromewebstore.google.com/detail/ld
 export const GUMROAD_BUY_URL = "https://tomyoost.gumroad.com/l/autoposter-starter";
 export const GUMROAD_FREE_URL = "https://tomyoost.gumroad.com/l/autoposter-gratis";
 export const GUMROAD_LIBRARY_URL = "https://app.gumroad.com/library";
+// Sign-up form for partners (affiliates, 30% on the subscription). Live since 21-11-2026.
+export const GUMROAD_PARTNER_URL = "https://tomyoost.gumroad.com/affiliates";
 
 // Controller (verwerkingsverantwoordelijke) and contact details for the privacy policy.
 // Empty fields are not shown. Fill in fullName, kvk and email when available.
